@@ -10,12 +10,22 @@ on:
         description: Coverage end date (exclusive)
         required: true
         default: "2026-09-20"
+
 permissions:
   contents: write
+  actions: read
+
 jobs:
   repair:
+    name: Repair ${{ matrix.timeframe }} / ${{ matrix.pair }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 170
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        pair: [usdjpy, eurjpy, gbpjpy, audjpy, eurusd, gbpusd, audusd, nzdusd, usdcad, usdchf, audnzd, eurgbp]
+        timeframe: [h4, d1]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -24,11 +34,65 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Repair missing historical ranges
-        run: python scripts/repair_market_gaps.py --start "${{ inputs.start }}" --end "${{ inputs.end }}"
+      - name: Repair this pair/timeframe
+        run: |
+          python scripts/repair_market_gaps.py \
+            --start "${{ inputs.start }}" \
+            --end "${{ inputs.end }}" \
+            --pair "${{ matrix.pair }}" \
+            --timeframe "${{ matrix.timeframe }}"
+      - name: Prepare artifact
+        run: |
+          mkdir -p repaired
+          cp "data/market/${{ matrix.timeframe }}/${{ matrix.pair }}.csv" \
+             "repaired/${{ matrix.timeframe }}_${{ matrix.pair }}.csv"
+      - name: Upload repaired pair
+        uses: actions/upload-artifact@v4
+        with:
+          name: repaired-${{ matrix.timeframe }}-${{ matrix.pair }}
+          path: repaired/${{ matrix.timeframe }}_${{ matrix.pair }}.csv
+          if-no-files-found: error
+
+  finalize:
+    name: Merge, validate and commit
+    if: ${{ always() }}
+    needs: repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: repaired-*
+          path: repaired
+          merge-multiple: true
+
+      - name: Verify all pair/timeframe artifacts arrived
+        run: |
+          expected=24
+          actual=$(find repaired -maxdepth 1 -type f -name '*.csv' | wc -l)
+          echo "expected=$expected actual=$actual"
+          test "$actual" -eq "$expected"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Merge repaired data
+        run: |
+          set -e
+          for f in repaired/*.csv; do
+            name="$(basename "$f" .csv)"
+            tf="${name%%_*}"
+            pair="${name#*_}"
+            mkdir -p "data/market/$tf"
+            cp "$f" "data/market/$tf/$pair.csv"
+          done
+
       - run: python scripts/provenance_report.py
       - run: python scripts/validate_market_data.py
       - run: python scripts/validate_market_coverage.py
+
       - name: Commit repaired data
         run: |
           git config user.name "fx-research-bot"
@@ -36,6 +100,7 @@ jobs:
           git add data/market reports/data_provenance.json
           git diff --cached --quiet || git commit -m "data: repair missing FX historical ranges"
           git push
+
       - uses: actions/upload-artifact@v4
         with:
           name: fx-data-repair-provenance
