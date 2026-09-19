@@ -17,7 +17,7 @@ def native_periods(tf, start, end):
                 f"https://datafeed.dukascopy.com/datafeed/{{pair}}/"
                 f"{year}/BID_candles_day_1.bi5"
             )
-    elif tf == "h4":
+    elif tf in ("h1", "h4"):
         cur = date(start.year, start.month, 1)
         while cur < end:
             if cur.month == 12:
@@ -27,9 +27,10 @@ def native_periods(tf, start, end):
             base = datetime(cur.year, cur.month, 1, tzinfo=timezone.utc)
             period_end = datetime(nxt.year, nxt.month, 1, tzinfo=timezone.utc)
             month0 = cur.month - 1
+            suffix = "BID_candles_hour_1.bi5" if tf == "h1" else "BID_candles_hour_4.bi5"
             yield base, period_end, (
                 f"https://datafeed.dukascopy.com/datafeed/{{pair}}/"
-                f"{cur.year}/{month0:02d}/BID_candles_hour_4.bi5"
+                f"{cur.year}/{month0:02d}/{suffix}"
             )
             cur = nxt
 
@@ -157,17 +158,86 @@ def download_native_candles(pair, tf, start, end, out, tmp):
         if count == 0:
             period_failures += 1
 
-    if not rows or period_failures:
-        return False
+    if rows and not period_failures:
+        tmpdir = tmp / f"native_{pair}_{tf}"
+        tmpdir.mkdir(parents=True, exist_ok=True)
+        chunk = tmpdir / "native.csv"
+        with chunk.open("w", newline="") as f:
+            w = csv.DictWriter(
+                f,
+                fieldnames=["timestamp", "open", "high", "low", "close", "volume"],
+            )
+            w.writeheader()
+            w.writerows(rows)
+        return chunk
 
-    tmpdir = tmp / f"native_{pair}_{tf}"
-    tmpdir.mkdir(parents=True, exist_ok=True)
-    chunk = tmpdir / "native.csv"
-    with chunk.open("w", newline="") as f:
-        w = csv.DictWriter(
-            f,
-            fieldnames=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-        w.writeheader()
-        w.writerows(rows)
-    return chunk
+    if tf == "h4":
+        h1_rows = []
+        h1_failures = 0
+        for base, _period_end, url_tpl in native_periods("h1", start, end):
+            url = url_tpl.format(pair=pair.upper())
+            try:
+                result = _get(url)
+                if isinstance(result, tuple):
+                    raw, err = result
+                    if raw is None:
+                        raise RuntimeError(err)
+                else:
+                    raw = result
+                data = lzma.decompress(raw)
+                if len(data) < 24 or len(data) % 24:
+                    raise RuntimeError(f"invalid record length={len(data)}")
+            except Exception as e:
+                print(f"[H1-WARN] {pair} h1 {base.date()} unavailable: {e}", flush=True)
+                h1_failures += 1
+                continue
+
+            base_epoch = int(base.timestamp())
+            count = 0
+            for off in range(0, len(data), 24):
+                sec, o, c, low, high, vol = struct.unpack_from(">IIIIIf", data, off)
+                if not (o and c and high and low):
+                    continue
+                epoch = base_epoch + sec
+                dt = datetime.fromtimestamp(epoch, timezone.utc)
+                if start <= dt.date() < end:
+                    h1_rows.append({
+                        "timestamp": str(epoch * 1000),
+                        "open": str(o / scale),
+                        "high": str(high / scale),
+                        "low": str(low / scale),
+                        "close": str(c / scale),
+                        "volume": str(vol),
+                    })
+                    count += 1
+            print(f"[H1] {pair} h1 {base.date()} rows={count}", flush=True)
+            if count == 0:
+                h1_failures += 1
+
+        if h1_rows and not h1_failures:
+            buckets = {}
+            for r in h1_rows:
+                epoch_ms = int(r["timestamp"])
+                bucket = (epoch_ms // (4 * 3600 * 1000)) * (4 * 3600 * 1000)
+                buckets.setdefault(bucket, []).append(r)
+            h4_rows = []
+            for bucket in sorted(buckets):
+                rs = sorted(buckets[bucket], key=lambda r: int(r["timestamp"]))
+                h4_rows.append({
+                    "timestamp": str(bucket),
+                    "open": rs[0]["open"],
+                    "high": format(max(float(r["high"]) for r in rs), ".10f").rstrip("0").rstrip("."),
+                    "low": format(min(float(r["low"]) for r in rs), ".10f").rstrip("0").rstrip("."),
+                    "close": rs[-1]["close"],
+                    "volume": str(sum(float(r["volume"]) for r in rs)),
+                })
+            tmpdir = tmp / f"native_{pair}_{tf}"
+            tmpdir.mkdir(parents=True, exist_ok=True)
+            chunk = tmpdir / "native.csv"
+            with chunk.open("w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=["timestamp","open","high","low","close","volume"])
+                w.writeheader()
+                w.writerows(h4_rows)
+            return chunk
+
+    return False
