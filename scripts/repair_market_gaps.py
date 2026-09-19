@@ -153,16 +153,21 @@ def find_gaps(pair,tf,start,end):
             gaps.append(("internal",ts_date(a)+timedelta(days=1),ts_date(b)))
     return gaps
 
-ap=argparse.ArgumentParser()
+ ap=argparse.ArgumentParser()
 ap.add_argument("--start",default=CFG["history_start"])
 ap.add_argument("--end",default=(date.today()+timedelta(days=1)).isoformat())
+ap.add_argument("--pair",default=None,choices=CFG["pairs"])
+ap.add_argument("--timeframe",default=None,choices=CFG["timeframes"])
 a=ap.parse_args()
 start=date.fromisoformat(a.start)
 end=date.fromisoformat(a.end)
 
 tasks=[]
-for pair in CFG["pairs"]:
-    for tf in CFG["timeframes"]:
+pairs=[a.pair] if a.pair else CFG["pairs"]
+timeframes=[a.timeframe] if a.timeframe else CFG["timeframes"]
+
+for pair in pairs:
+    for tf in timeframes:
         for kind,s,e in find_gaps(pair,tf,start,end):
             if s < e:
                 tasks.append((pair,tf,kind,s,e))
@@ -185,8 +190,8 @@ if failed:
 # Re-scan after repair. Never report success merely because the downloader
 # exited successfully.
 remaining=[]
-for pair in CFG["pairs"]:
-    for tf in CFG["timeframes"]:
+for pair in pairs:
+    for tf in timeframes:
         gaps=find_gaps(pair,tf,start,end)
         for kind,s,e in gaps:
             remaining.append((pair,tf,kind,s,e))
