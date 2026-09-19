@@ -1,5 +1,6 @@
 name: FX Data Gap Repair
 on:
+  push:
   workflow_dispatch:
     inputs:
       start:
@@ -22,7 +23,7 @@ jobs:
     timeout-minutes: 170
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 2
       matrix:
         pair: [usdjpy, eurjpy, gbpjpy, audjpy, eurusd, gbpusd, audusd, nzdusd, usdcad, usdchf, audnzd, eurgbp]
         timeframe: [h4, d1]
