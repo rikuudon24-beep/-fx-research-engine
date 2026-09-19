@@ -77,7 +77,7 @@ def download_range(pair,tf,start,end,idx):
         chunk_file=tmp/"chunk.csv"
 
         cmd=[
-            "npx","--yes","dukascopy-node@1.50.0",
+            "npx","--yes","dukascopy-node@1.46.4",
             "-i",pair,
             "-from",cur.isoformat(),
             "-to",chunk_end.isoformat(),
@@ -120,7 +120,7 @@ def download_range(pair,tf,start,end,idx):
                     f"attempt {attempt}/3: {e}",
                     flush=True
                 )
-                time.sleep(5*attempt)
+                time.sleep(30*attempt)
 
         if not ok:
             return False
