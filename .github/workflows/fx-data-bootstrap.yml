@@ -1,0 +1,40 @@
+name: FX Data Bootstrap
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: History start date
+        required: true
+        default: "2021-01-01"
+      end:
+        description: History end date
+        required: true
+        default: "2026-09-20"
+permissions:
+  contents: write
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python scripts/download_market_data.py --mode bootstrap --start "${{ inputs.start }}" --end "${{ inputs.end }}"
+      - run: python scripts/provenance_report.py
+      - run: python scripts/validate_market_data.py
+      - name: Commit data
+        run: |
+          git config user.name "fx-research-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/market reports/data_provenance.json
+          git diff --cached --quiet || git commit -m "data: bootstrap FX historical market data"
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fx-bootstrap-provenance
+          path: reports/data_provenance.json
