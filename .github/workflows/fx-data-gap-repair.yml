@@ -1,6 +1,5 @@
 name: FX Data Gap Repair
 on:
-  push:
   workflow_dispatch:
     inputs:
       start:
@@ -18,7 +17,6 @@ permissions:
 
 jobs:
   repair:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'run native FX repair' }}
     name: Repair ${{ matrix.timeframe }} / ${{ matrix.pair }}
     runs-on: ubuntu-latest
     timeout-minutes: 170
@@ -56,7 +54,6 @@ jobs:
           if-no-files-found: error
 
   finalize:
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'run native FX repair') }}
     name: Merge, validate and commit
     if: ${{ always() }}
     needs: repair
