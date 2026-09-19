@@ -91,7 +91,10 @@ def download_range(pair,tf,start,end,idx):
             "-dir",str(tmp),
             "-fn","chunk.csv",
             "-bs","5",
-            "-bp","1500"
+            "-bp","5000",
+            "-rp","10000",
+            "-ch",
+            "-chpath",str(ROOT/".dukascopy-cache-repair")
         ]
 
         ok=False
