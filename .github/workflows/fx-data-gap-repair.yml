@@ -27,7 +27,7 @@ jobs:
       - name: Repair missing historical ranges
         run: python scripts/repair_market_gaps.py --start "${{ inputs.start }}" --end "${{ inputs.end }}"
       - run: python scripts/provenance_report.py
-      - run: python scripts/validate_market_data.py
+      - run: python scripts/validate_market_data.py\n      - run: python scripts/validate_market_coverage.py
       - name: Commit repaired data
         run: |
           git config user.name "fx-research-bot"
