@@ -2,6 +2,7 @@
 import argparse,csv,json,shutil,subprocess,sys,time
 from datetime import date,timedelta,datetime,timezone
 from pathlib import Path
+from scripts.native_candles import download_native_candles
 
 ROOT=Path(__file__).resolve().parents[1]
 CFG=json.loads((ROOT/"config/market_data.json").read_text())
@@ -64,6 +65,21 @@ def download_range(pair,tf,start,end,idx):
     out=OUT/tf
     out.mkdir(parents=True,exist_ok=True)
     final=out/f"{pair}.csv"
+    # Prefer native H4/D1 candle files. dukascopy-node currently has
+    # intermittent datafeed failures on many historical chunks.
+    if tf in ("h4","d1"):
+        try:
+            native_chunk=download_native_candles(pair,tf,start,end,OUT,TMP)
+            if native_chunk:
+                merge(final,[native_chunk])
+                print(
+                    f"[NATIVE-REPAIRED] {pair} {tf} {start} -> {end}",
+                    flush=True,
+                )
+                return True
+        except Exception as e:
+            print(f"[NATIVE-WARN] {pair} {tf}: {e}",flush=True)
+
     cur=start
     chunk_no=0
 
