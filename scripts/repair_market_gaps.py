@@ -2,7 +2,7 @@
 import argparse,csv,json,shutil,subprocess,sys,time
 from datetime import date,timedelta,datetime,timezone
 from pathlib import Path
-from scripts.native_candles import download_native_candles
+from native_candles import download_native_candles
 
 ROOT=Path(__file__).resolve().parents[1]
 CFG=json.loads((ROOT/"config/market_data.json").read_text())
