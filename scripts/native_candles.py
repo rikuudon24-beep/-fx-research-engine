@@ -10,7 +10,7 @@ from datetime import date, datetime, timezone
 def native_periods(tf, start, end):
     """Return native Dukascopy candle-file periods covering [start, end)."""
     if tf == "d1":
-        for year in range(start.year, end.year + 1):
+        # The end date is exclusive. Do not fetch the year containing\n        # end when end is exactly Jan 1; that year contributes zero rows\n        # and would incorrectly mark an otherwise complete native repair\n        # as failed.\n        for year in range(start.year, end.year):
             base = datetime(year, 1, 1, tzinfo=timezone.utc)
             period_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
             yield base, period_end, (
