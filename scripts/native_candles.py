@@ -10,11 +10,12 @@ from datetime import date, datetime, timezone
 def native_periods(tf, start, end):
     """Return native Dukascopy candle-file periods covering [start, end)."""
     if tf == "d1":
-        # The end date is exclusive, but the year containing end must still\n        # be fetched when end falls inside that year. If end is exactly Jan 1,\n        # the following year's file is not needed.\n        last_year = end.year if end.month != 1 or end.day != 1 else end.year - 1\n        for year in range(start.year, last_year + 1):
+        last_year = end.year if (end.month, end.day) != (1, 1) else end.year - 1
+        for year in range(start.year, last_year + 1):
             base = datetime(year, 1, 1, tzinfo=timezone.utc)
+            if base.date() >= end:
+                break
             period_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
-            if base >= datetime(end.year, end.month, end.day, tzinfo=timezone.utc):
-                continue
             yield base, period_end, (
                 f"https://datafeed.dukascopy.com/datafeed/{{pair}}/"
                 f"{year}/BID_candles_day_1.bi5"
