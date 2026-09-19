@@ -38,24 +38,36 @@ def merge(final, files):
     final.with_suffix(".tmp").replace(final)
 
 def download_range(pair,tf,start,end,idx):
+    # Download in <=31-day chunks. Large missing ranges can otherwise return
+    # incomplete results without a hard downloader error.
     out=OUT/tf; out.mkdir(parents=True,exist_ok=True)
     tmp=TMP/f"{pair}_{tf}_{idx}"; tmp.mkdir(parents=True,exist_ok=True)
     final=out/f"{pair}.csv"
-    cmd=["npx","--yes","dukascopy-node@1.50.0","-i",pair,"-from",start.isoformat(),
-         "-to",end.isoformat(),"-t",tf,"-f","csv","-p","bid","-v","-dir",str(tmp),
-         "-bs","5","-bp","1500"]
-    for attempt in range(1,4):
-        try:
-            subprocess.run(cmd,cwd=ROOT,check=True,timeout=900)
-            files=sorted(tmp.glob("*.csv"),key=lambda p:p.stat().st_mtime,reverse=True)
-            if not files: raise RuntimeError("no CSV produced")
-            merge(final,files)
-            print(f"[REPAIRED] {pair} {tf} {start} -> {end}",flush=True)
-            return True
-        except Exception as e:
-            print(f"[WARN] {pair} {tf} {start}->{end} attempt {attempt}/3: {e}",flush=True)
-            time.sleep(5*attempt)
-    return False
+    cur=start
+    chunk_no=0
+    while cur < end:
+        chunk_end=min(cur+timedelta(days=31),end)
+        chunk_no += 1
+        cmd=["npx","--yes","dukascopy-node@1.50.0","-i",pair,"-from",cur.isoformat(),
+             "-to",chunk_end.isoformat(),"-t",tf,"-f","csv","-p","bid","-v","-dir",str(tmp),
+             "-bs","5","-bp","1500"]
+        ok=False
+        for attempt in range(1,4):
+            try:
+                subprocess.run(cmd,cwd=ROOT,check=True,timeout=900)
+                files=sorted(tmp.glob("*.csv"),key=lambda p:p.stat().st_mtime,reverse=True)
+                if not files: raise RuntimeError("no CSV produced")
+                merge(final,files)
+                ok=True
+                break
+            except Exception as e:
+                print(f"[WARN] {pair} {tf} {cur}->{chunk_end} attempt {attempt}/3: {e}",flush=True)
+                time.sleep(5*attempt)
+        if not ok:
+            return False
+        cur=chunk_end
+    print(f"[REPAIRED] {pair} {tf} {start} -> {end} in {chunk_no} chunks",flush=True)
+    return True
 
 def find_gaps(pair,tf,start,end):
     path=OUT/tf/f"{pair}.csv"
