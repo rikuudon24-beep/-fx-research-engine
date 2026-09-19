@@ -173,6 +173,8 @@ for t in tasks:
 
 failed=[]
 for i,(pair,tf,kind,s,e) in enumerate(tasks,1):
+    if i > 1:
+        time.sleep(8)
     if not download_range(pair,tf,s,e,i):
         failed.append((pair,tf,kind,s,e))
 
