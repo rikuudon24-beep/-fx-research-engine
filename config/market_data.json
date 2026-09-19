@@ -1,0 +1,10 @@
+{
+  "pairs": ["usdjpy","eurjpy","gbpjpy","audjpy","eurusd","gbpusd","audusd","nzdusd","usdcad","usdchf","audnzd","eurgbp"],
+  "timeframes": ["h4","d1"],
+  "history_start": "2021-01-01",
+  "incremental_days": 45,
+  "units": 10000,
+  "target_jpy": 5000,
+  "source": "Dukascopy via dukascopy-node",
+  "price_type": "bid"
+}
