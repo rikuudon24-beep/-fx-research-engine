@@ -1,6 +1,5 @@
 name: FX Data Gap Repair
 on:
-  push:
   workflow_dispatch:
     inputs:
       start:
