@@ -60,15 +60,20 @@ def features(df):
     }, index=df.index)
 
 def load_events():
-    e=pd.read_csv("reports/50pip_events.csv",parse_dates=["event_timestamp","hit_timestamp"])
-    return e[e.threshold_pips==50].copy()
+    e=pd.read_csv("reports/50pip_events.csv")
+    e["event_timestamp"]=pd.to_datetime(e["event_timestamp"],utc=True,errors="coerce")
+    e["hit_timestamp"]=pd.to_datetime(e["hit_timestamp"],utc=True,errors="coerce")
+    e=e.dropna(subset=["event_timestamp","hit_timestamp"]).copy()
+    return e
 
 def event_features(events):
     chunks=[]
     for tf in TFS:
         for pair in PAIRS:
             path=Path("data/market")/tf/f"{pair}.csv"
-            df=pd.read_csv(path,parse_dates=["timestamp"]).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+            df=pd.read_csv(path)
+            df["timestamp"]=pd.to_datetime(df["timestamp"],utc=True,errors="coerce")
+            df=df.dropna(subset=["timestamp"]).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
             f=features(df)
             z=pd.concat([df[["timestamp","close"]],f],axis=1)
             z["pair"]=pair; z["timeframe"]=tf
@@ -76,7 +81,15 @@ def event_features(events):
     allf=pd.concat(chunks,ignore_index=True)
     e=events.copy()
     e["pair"]=e.pair.astype(str); e["timeframe"]=e.timeframe.astype(str)
-    out=e.merge(allf,left_on=["pair","timeframe","event_timestamp"],right_on=["pair","timeframe","timestamp"],how="left")
+    e["event_timestamp"]=pd.to_datetime(e["event_timestamp"],utc=True,errors="coerce")
+    allf["timestamp"]=pd.to_datetime(allf["timestamp"],utc=True,errors="coerce")
+    out=e.merge(
+        allf,
+        left_on=["pair","timeframe","event_timestamp"],
+        right_on=["pair","timeframe","timestamp"],
+        how="left",
+        validate="many_to_one",
+    )
     return out
 
 def directional_conditions(direction):
@@ -117,7 +130,9 @@ def evaluate(group, names, conds, target):
     return n,hit
 
 def main():
-    events=event_features(load_events())
+    all_events=load_events()
+    base_events=all_events[all_events.threshold_pips==50].copy()
+    events=event_features(base_events)
     missing=int(events[[c for c in ["rsi30_45","adx25","di_bull"] if c in events]].isna().all(axis=1).sum())
     if missing:
         print(f"WARNING feature rows missing={missing}")
@@ -131,7 +146,7 @@ def main():
                 d[target]=False
                 # event file has one row per threshold, so reconstruct by event key
                 key=["pair","timeframe","direction","event_timestamp"]
-                hits=events[events.threshold_pips==th][key].assign(**{target:True})
+                hits=all_events[all_events.threshold_pips==th][key].drop_duplicates().assign(**{target:True})
                 d=d.merge(hits,on=key,how="left",suffixes=("","_y"))
                 d[target]=d[target+"_y"].fillna(False) if target+"_y" in d else d[target]
                 if target+"_y" in d: d.drop(columns=[target+"_y"],inplace=True)
@@ -157,7 +172,7 @@ def main():
             base["date"]=base.event_timestamp.dt.date
             for th in LADDER[1:]:
                 key=["pair","timeframe","direction","event_timestamp"]
-                hits=events[events.threshold_pips==th][key].assign(hit=True)
+                hits=all_events[all_events.threshold_pips==th][key].drop_duplicates().assign(hit=True)
                 d=base.merge(hits,on=key,how="left"); d["hit"]=d.hit.fillna(False)
                 conds=directional_conditions(direction)
                 names=list(conds)
@@ -190,6 +205,9 @@ def main():
     sc=pd.DataFrame(scored,columns=cols)
     sc.to_csv("reports/50pip_continuation_oos.csv",index=False,float_format="%.8f")
     print("continuation_rows",len(res),"oos_candidates",len(sc))
+    if not res.empty:
+        print("target_base_rates")
+        print(res.groupby(["timeframe","direction","target_pips"])["base_rate"].first().to_string())
     print(sc.head(50).to_string(index=False))
 
 if __name__=="__main__":
