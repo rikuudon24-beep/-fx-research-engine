@@ -11,7 +11,7 @@ on:
       - "scripts/research_50pip_conditions.py"
       - "scripts/research_50pip_continuation.py"
       - "scripts/research_50pip_trade_path.py"
-      - "data/market/**
+      - "data/market/**"
       - ".github/workflows/fx-100pip-research.yml"
 
 permissions:
