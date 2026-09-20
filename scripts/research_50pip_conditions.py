@@ -45,7 +45,6 @@ def label(df,pair,tf):
     return out
 
 def main():
-    rows=[]
     datasets=[]
     for tf in TFS:
       for pair in PAIRS:
@@ -63,15 +62,18 @@ def main():
       "bb_below_mid":lambda x:x.bbpos<.5,"bb_above_mid":lambda x:x.bbpos>.5,
       "body_ratio_gt60":lambda x:x.body_ratio>.6,
     }
+    feature_cols=["ema_stack_bull","ema_stack_bear","price_above_ema20","price_above_200",
+                  "rsi14","macd_hist","adx14","pdi","mdi","atr_pct","bbpos","body_ratio"]
     out=[]
     for tf in TFS:
       d=data[data.timeframe==tf]
       for direction in ("bull","bear"):
         for hor in HORIZONS[tf]:
-          target=f"{direction}_h{hor}"; q=d[[target]+list(conds)].dropna(subset=[target])
+          target=f"{direction}_h{hor}"
+          q=d[[target]+feature_cols].dropna(subset=[target])
           base=q[target].mean()
           for name,fn in conds.items():
-            m=fn(q); n=int(m.sum())
+            m=fn(q).fillna(False); n=int(m.sum())
             if n<100: continue
             rate=q.loc[m,target].mean()
             out.append({"timeframe":tf,"direction":direction,"horizon_bars":hor,"condition":name,
