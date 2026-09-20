@@ -243,4 +243,75 @@ def download_native_candles(pair, tf, start, end, out, tmp):
                 w.writerows(h4_rows)
             return chunk
 
+    if tf == "d1":
+        h1_rows = []
+        h1_failures = 0
+        for base, _period_end, url_tpl in native_periods("h1", start, end):
+            url = url_tpl.format(pair=pair.upper())
+            try:
+                result = _get(url)
+                if isinstance(result, tuple):
+                    raw, err = result
+                    if raw is None:
+                        raise RuntimeError(err)
+                else:
+                    raw = result
+                data = lzma.decompress(raw)
+                if len(data) < 24 or len(data) % 24:
+                    raise RuntimeError(f"invalid record length={len(data)}")
+            except Exception as e:
+                print(f"[H1-WARN] {pair} h1 {base.date()} unavailable: {e}", flush=True)
+                h1_failures += 1
+                continue
+
+            base_epoch = int(base.timestamp())
+            count = 0
+            for off in range(0, len(data), 24):
+                sec, o, c, low, high, vol = struct.unpack_from(">IIIIIf", data, off)
+                if not (o and c and high and low):
+                    continue
+                epoch = base_epoch + sec
+                dt = datetime.fromtimestamp(epoch, timezone.utc)
+                if start <= dt.date() < end:
+                    h1_rows.append({
+                        "timestamp": str(epoch * 1000),
+                        "open": str(o / scale),
+                        "high": str(high / scale),
+                        "low": str(low / scale),
+                        "close": str(c / scale),
+                        "volume": str(vol),
+                    })
+                    count += 1
+            print(f"[H1] {pair} h1 {base.date()} rows={count}", flush=True)
+            if count == 0:
+                h1_failures += 1
+
+        if h1_rows and not h1_failures:
+            buckets = {}
+            for r in h1_rows:
+                epoch_ms = int(r["timestamp"])
+                bucket = (epoch_ms // 86400000) * 86400000
+                buckets.setdefault(bucket, []).append(r)
+            d1_rows = []
+            for bucket in sorted(buckets):
+                rs = sorted(buckets[bucket], key=lambda r: int(r["timestamp"]))
+                d1_rows.append({
+                    "timestamp": str(bucket),
+                    "open": rs[0]["open"],
+                    "high": format(max(float(r["high"]) for r in rs), ".10f").rstrip("0").rstrip("."),
+                    "low": format(min(float(r["low"]) for r in rs), ".10f").rstrip("0").rstrip("."),
+                    "close": rs[-1]["close"],
+                    "volume": str(sum(float(r["volume"]) for r in rs)),
+                })
+            tmpdir = tmp / f"native_{pair}_{tf}"
+            tmpdir.mkdir(parents=True, exist_ok=True)
+            chunk = tmpdir / "native.csv"
+            with chunk.open("w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=["timestamp","open","high","low","close","volume"])
+                w.writeheader()
+                w.writerows(d1_rows)
+            print(f"[H1-RESAMPLE] {pair} d1 rows={len(d1_rows)}", flush=True)
+            return chunk
+
+
     return False
