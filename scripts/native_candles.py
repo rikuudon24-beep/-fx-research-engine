@@ -289,7 +289,8 @@ def download_native_candles(pair, tf, start, end, out, tmp):
             if count == 0:
                 h1_failures += 1
 
-        if h1_rows and not h1_failures:
+        if h1_rows:
+            # Keep partial H1 coverage; repair_market_gaps will rescan and repair remaining gaps.
             buckets = {}
             for r in h1_rows:
                 epoch_ms = int(r["timestamp"])
