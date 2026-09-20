@@ -37,11 +37,12 @@ jobs:
             reports/50pip_event_summary.csv
             reports/50pip_data_quality.csv
             reports/50pip_condition_summary.csv
+            reports/50pip_condition_pair_summary.csv
             reports/50pip_feature_dataset.csv
       - name: Commit research datasets
         run: |
           git config user.name "fx-research-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_feature_dataset.csv
+          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_condition_pair_summary.csv reports/50pip_feature_dataset.csv
           git diff --cached --quiet || git commit -m "research: extract 50pip events and indicator conditions"
           git push
