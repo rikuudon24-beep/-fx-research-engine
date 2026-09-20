@@ -18,8 +18,9 @@ def main():
     for cond in focus_conditions:
         names=cond.split("+")
         for pair in focus_pairs:
-            e=base[base.pair==pair].copy()
-            # Reuse the already generated pair-level OOS candidate membership.
+            e=events[(events.pair==pair)&(events.timeframe=="h4")&(events.direction=="bear")].copy()
+            # Reuse the generated focus-pair list, but evaluate conditions on the
+            # feature-enriched event rows (not the raw 50pip event table).
             detail=focus[(focus.conditions==cond)&(focus.pair==pair)]
             if detail.empty: continue
             conds=directional_conditions("bear")
