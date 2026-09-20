@@ -72,10 +72,25 @@ def download_range(pair,tf,start,end,idx):
             native_chunk=download_native_candles(pair,tf,start,end,OUT,TMP)
             if native_chunk:
                 merge(final,[native_chunk])
+                native_complete, native_count, native_first, native_last = chunk_has_data(native_chunk, start, end)
                 print(
-                    f"[NATIVE-REPAIRED] {pair} {tf} {start} -> {end}",
+                    f"[NATIVE-REPAIRED] {pair} {tf} {start} -> {end} "
+                    f"rows_in_range={native_count} source={native_first}->{native_last}",
                     flush=True,
                 )
+                # Do not stop on partial native/resampled coverage. Re-scan the
+                # file and let the next acquisition strategy repair only what is
+                # still missing.
+                if native_complete and native_first <= start and native_last >= end - timedelta(days=1):
+                    return True
+                remaining = find_gaps(pair, tf, start, end)
+                if remaining:
+                    print(f"[NATIVE-PARTIAL] remaining gaps: {remaining}", flush=True)
+                    for _kind, rem_start, rem_end in remaining:
+                        if rem_start < rem_end:
+                            if not download_range(pair, tf, rem_start, rem_end, idx):
+                                return False
+                    return not find_gaps(pair, tf, start, end)
                 return True
         except Exception as e:
             print(f"[NATIVE-WARN] {pair} {tf}: {e}",flush=True)
