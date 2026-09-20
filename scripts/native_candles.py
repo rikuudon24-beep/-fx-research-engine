@@ -143,17 +143,7 @@ def download_m1_resampled(pair, tf, start, end, out, tmp):
         day = day.fromordinal(day.toordinal() + 1)
 
     if not rows:
-        # Current/recent months may not have H1/D1 aggregate files yet.
-    # Dukascopy publishes M1 candles per day, so resample those locally first.
-    try:
-        m1_chunk = download_m1_resampled(pair, tf, start, end, out, tmp)
-        if m1_chunk:
-            print(f"[M1-FALLBACK] {pair} {tf} using daily M1 candles", flush=True)
-            return m1_chunk
-    except Exception as e:
-        print(f"[M1-WARN] {pair} {tf} fallback failed: {e}", flush=True)
-
-    return None
+        return None
 
     width = 4 * 3600 * 1000 if tf == "h4" else 86400000
     buckets = {}
