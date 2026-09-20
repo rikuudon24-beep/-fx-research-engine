@@ -1,0 +1,40 @@
+name: FX 100pip Event Research
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/extract_100pip_events.py"
+      - "data/market/**"
+      - ".github/workflows/fx-100pip-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Extract 100pip events
+        run: python scripts/extract_100pip_events.py
+      - name: Upload research reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: 100pip-research
+          path: |
+            reports/100pip_events.csv
+            reports/100pip_event_summary.csv
+            reports/100pip_data_quality.csv
+      - name: Commit research datasets
+        run: |
+          git config user.name "fx-research-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/100pip_events.csv reports/100pip_event_summary.csv reports/100pip_data_quality.csv
+          git diff --cached --quiet || git commit -m "research: extract 100pip movement events"
+          git push
