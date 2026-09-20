@@ -44,7 +44,8 @@ jobs:
             reports/50pip_feature_dataset.csv
             reports/50pip_continuation_combinations.csv
             reports/50pip_continuation_oos.csv
-            reports/50pip_continuation_robustness.csv
+            reports/50pip_continuation_robustness.csv reports/50pip_candidate_shortlist.csv
+            reports/50pip_candidate_shortlist.csv
       - name: Commit research datasets
         run: |
           git config user.name "fx-research-bot"
