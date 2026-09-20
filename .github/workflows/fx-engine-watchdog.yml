@@ -42,7 +42,13 @@ jobs:
           if [ -n "$EVENT_RUN_ID" ]; then
             RUN_ID="$EVENT_RUN_ID"
           else
-            RUN_ID="$(gh run list --repo "$REPO" --workflow "$WORKFLOW" --limit 1 --json databaseId --jq '.[0].databaseId')"
+            # Scheduled/manual watchdog checks must inspect the latest active run
+            # first, not simply the latest-created run (which could be a completed
+            # retry or another historical attempt).
+            RUN_ID="$(gh run list --repo "$REPO" --workflow "$WORKFLOW" --limit 20 --json databaseId,status,createdAt --jq '[.[] | select(.status=="in_progress" or .status=="queued")] | sort_by(.createdAt) | last | .databaseId // empty')"
+            if [ -z "$RUN_ID" ]; then
+              RUN_ID="$(gh run list --repo "$REPO" --workflow "$WORKFLOW" --limit 1 --json databaseId --jq '.[0].databaseId')"
+            fi
           fi
 
           if [ -z "$RUN_ID" ]; then
