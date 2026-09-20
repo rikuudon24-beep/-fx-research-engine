@@ -33,6 +33,7 @@ jobs:
           WORKFLOW="FX Data Gap Repair"
           MAX_ATTEMPTS=3
           STUCK_MINUTES=190
+          INACTIVE_MINUTES=35
 
           echo "=== FX Engine Watchdog ==="
 
@@ -127,15 +128,39 @@ The watchdog stopped automatic retries to avoid an infinite repair loop."
             exit 0
           fi
 
-          # Stuck-run protection. The repair workflow has a 170-minute job
-          # timeout, so 190 minutes is intentionally slightly above that.
+          # Stuck-run protection: never cancel merely because the workflow is old.
+          # First check whether any job has reported activity recently. A long-running
+          # repair can be healthy; only an old run with no recent job activity is
+          # considered stuck.
           if [ "$STATUS" = "in_progress" ]; then
             AGE_SECONDS=$(( $(date -u +%s) - $(date -u -d "$CREATED" +%s) ))
             AGE_MINUTES=$(( AGE_SECONDS / 60 ))
             echo "Run age: ${AGE_MINUTES} minutes"
 
+            JOB_STATE="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '
+              [.jobs[] | select(.status=="in_progress" or .status=="queued") |
+               {status:.status, updated_at:.updated_at}]')"
+
+            RECENT=0
+            NOW="$(date -u +%s)"
+            while read -r TS; do
+              [ -z "$TS" ] && continue
+              T="$(date -u -d "$TS" +%s)"
+              AGE=$(( (NOW - T) / 60 ))
+              if [ "$AGE" -le "$INACTIVE_MINUTES" ]; then
+                RECENT=1
+                echo "[WATCH] active job updated ${AGE} min ago."
+                break
+              fi
+            done < <(jq -r '.[].updated_at' <<<"$JOB_STATE")
+
+            if [ "$RECENT" -eq 1 ]; then
+              echo "[WATCH] run is old but still active; do not cancel."
+              exit 0
+            fi
+
             if [ "$AGE_MINUTES" -ge "$STUCK_MINUTES" ]; then
-              echo "[RECOVERY] run appears stuck; cancelling and restarting the full workflow."
+              echo "[RECOVERY] run is old and has had no recent job activity; cancelling and restarting."
               gh api -X POST "repos/$REPO/actions/runs/$RUN_ID/cancel" || true
               sleep 5
               gh api -X POST "repos/$REPO/actions/runs/$RUN_ID/rerun"
