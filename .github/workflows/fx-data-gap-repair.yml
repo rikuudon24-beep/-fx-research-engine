@@ -1,4 +1,5 @@
 name: FX Data Gap Repair
+# Auto-retrigger after repair-strategy improvements.
 on:
   push:
     branches: [main]
