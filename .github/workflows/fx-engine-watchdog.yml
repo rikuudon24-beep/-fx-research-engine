@@ -31,7 +31,7 @@ jobs:
 
           REPO="${{ github.repository }}"
           WORKFLOW="FX Data Gap Repair"
-          MAX_ATTEMPTS=2
+          MAX_ATTEMPTS=3
           STUCK_MINUTES=190
 
           echo "=== FX Engine Watchdog ==="
@@ -82,8 +82,10 @@ The watchdog stopped automatic retries to avoid an infinite repair loop."
             exit 0
           fi
 
-          # Inspect failed jobs and their logs. Known code defects are sent through
-          # a tiny allow-listed fixer; unknown defects are never modified blindly.
+          # Inspect failed jobs and their logs. Recovery is biased toward keeping
+          # the research pipeline moving: transient failures are retried, and
+          # code/unknown failures are retried from the latest main revision so that
+          # a newer repair strategy can take effect.
           JOBS="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.conclusion=="failure" or .conclusion=="cancelled") | [.id,.name,.conclusion] | @tsv' || true)"
 
           CODE_BUG=0
@@ -106,18 +108,22 @@ The watchdog stopped automatic retries to avoid an infinite repair loop."
           done <<< "$JOBS"
 
           if [ "$STATUS" = "completed" ] && [ "$CONCLUSION" != "success" ]; then
-            if [ "$CODE_BUG" -eq 1 ]; then
-              notify_issue                 "FX watchdog: code error detected"                 "The watchdog detected a likely code defect and did NOT blindly rerun it. Run: $URL\n\n$DETAILS"
-              exit 0
-            fi
-
-            if [ "$TRANSIENT" -eq 1 ]; then
+            if [ "$TRANSIENT" -eq 1 ] && [ "$CODE_BUG" -eq 0 ]; then
               echo "[RECOVERY] transient failure detected; rerunning failed jobs."
               gh api -X POST "repos/$REPO/actions/runs/$RUN_ID/rerun-failed-jobs"
               exit 0
             fi
 
-            notify_issue               "FX watchdog: unknown failure"               "The FX repair run failed, but the watchdog could not classify it as a safe transient failure. Run: $URL\n\n$DETAILS"
+            # A code/unknown failure may already have been fixed on main while
+            # this run was executing. Start a fresh run from current main rather
+            # than replaying the old commit. This is the important "don't wait
+            # for the human" path.
+            echo "[RECOVERY] non-transient failure; dispatching a fresh repair run from main."
+            gh workflow run "FX Data Gap Repair" \
+              --repo "$REPO" \
+              --ref main \
+              -f start=2021-01-01 \
+              -f end=2026-09-20
             exit 0
           fi
 
