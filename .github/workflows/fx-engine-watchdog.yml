@@ -82,8 +82,8 @@ The watchdog stopped automatic retries to avoid an infinite repair loop."
             exit 0
           fi
 
-          # Inspect failed jobs and their logs. Known code defects are NOT
-          # blindly retried; transient/network failures are safe retry candidates.
+          # Inspect failed jobs and their logs. Known code defects are sent through
+          # a tiny allow-listed fixer; unknown defects are never modified blindly.
           JOBS="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.conclusion=="failure" or .conclusion=="cancelled") | [.id,.name,.conclusion] | @tsv' || true)"
 
           CODE_BUG=0
