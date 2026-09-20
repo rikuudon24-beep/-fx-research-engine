@@ -10,6 +10,8 @@ on:
         description: Coverage end date (exclusive)
         required: true
         default: "2026-09-20"
+  repository_dispatch:
+    types: [fx-data-repair]
 
 permissions:
   contents: write
@@ -37,8 +39,8 @@ jobs:
       - name: Repair this pair/timeframe
         run: |
           python scripts/repair_market_gaps.py \
-            --start "${{ inputs.start || '2021-01-01' }}" \
-            --end "${{ inputs.end || '2026-09-20' }}" \
+            --start "${{ inputs.start || github.event.client_payload.start || '2021-01-01' }}" \
+            --end "${{ inputs.end || github.event.client_payload.end || '2026-09-20' }}" \
             --pair "${{ matrix.pair }}" \
             --timeframe "${{ matrix.timeframe }}"
       - name: Prepare artifact
