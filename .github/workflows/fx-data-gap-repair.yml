@@ -8,6 +8,8 @@ on:
       - "scripts/repair_market_gaps.py"
       - ".github/workflows/fx-engine-watchdog.yml"
       - ".github/workflows/fx-data-gap-repair.yml"
+      - "config/market_data.json"
+      - "README.md"
   workflow_dispatch:
     inputs:
       start:
