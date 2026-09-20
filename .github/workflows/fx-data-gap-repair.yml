@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/native_candles.py"
       - "scripts/repair_market_gaps.py"
+      - ".github/workflows/fx-engine-watchdog.yml"
       - ".github/workflows/fx-data-gap-repair.yml"
   workflow_dispatch:
     inputs:
