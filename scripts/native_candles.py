@@ -91,6 +91,98 @@ def _get(url, attempts=5):
 
     raise RuntimeError(last_err or "native download failed")
 
+def download_m1_resampled(pair, tf, start, end, out, tmp):
+    """Fallback when H1/D1 aggregate files are not published yet."""
+    if tf not in ("h4", "d1"):
+        return None
+
+    scale = 1000 if pair.endswith("jpy") else 100000
+    rows = []
+    day = start
+    while day < end:
+        month0 = day.month - 1
+        url = (
+            f"https://datafeed.dukascopy.com/datafeed/{pair.upper()}/"
+            f"{day.year}/{month0:02d}/{day.day:02d}/BID_candles_min_1.bi5"
+        )
+        try:
+            result = _get(url)
+            if isinstance(result, tuple):
+                raw, err = result
+                if raw is None:
+                    raise RuntimeError(err)
+            else:
+                raw = result
+            data = lzma.decompress(raw)
+            if len(data) < 24 or len(data) % 24:
+                raise RuntimeError(f"invalid record length={len(data)}")
+        except Exception as e:
+            print(f"[M1-WARN] {pair} m1 {day} unavailable: {e}", flush=True)
+            day = day.fromordinal(day.toordinal() + 1)
+            continue
+
+        base_epoch = int(datetime(day.year, day.month, day.day, tzinfo=timezone.utc).timestamp())
+        count = 0
+        for off in range(0, len(data), 24):
+            sec, o, c, low, high, vol = struct.unpack_from(">IIIIIf", data, off)
+            if not (o and c and high and low):
+                continue
+            epoch = base_epoch + sec
+            dt = datetime.fromtimestamp(epoch, timezone.utc)
+            if start <= dt.date() < end:
+                rows.append({
+                    "timestamp": str(epoch * 1000),
+                    "open": str(o / scale),
+                    "high": str(high / scale),
+                    "low": str(low / scale),
+                    "close": str(c / scale),
+                    "volume": str(vol),
+                })
+                count += 1
+        print(f"[M1] {pair} m1 {day} rows={count}", flush=True)
+        day = day.fromordinal(day.toordinal() + 1)
+
+    if not rows:
+        # Current/recent months may not have H1/D1 aggregate files yet.
+    # Dukascopy publishes M1 candles per day, so resample those locally first.
+    try:
+        m1_chunk = download_m1_resampled(pair, tf, start, end, out, tmp)
+        if m1_chunk:
+            print(f"[M1-FALLBACK] {pair} {tf} using daily M1 candles", flush=True)
+            return m1_chunk
+    except Exception as e:
+        print(f"[M1-WARN] {pair} {tf} fallback failed: {e}", flush=True)
+
+    return None
+
+    width = 4 * 3600 * 1000 if tf == "h4" else 86400000
+    buckets = {}
+    for r in rows:
+        bucket = (int(r["timestamp"]) // width) * width
+        buckets.setdefault(bucket, []).append(r)
+
+    result_rows = []
+    for bucket in sorted(buckets):
+        rs = sorted(buckets[bucket], key=lambda r: int(r["timestamp"]))
+        result_rows.append({
+            "timestamp": str(bucket),
+            "open": rs[0]["open"],
+            "high": format(max(float(r["high"]) for r in rs), ".10f").rstrip("0").rstrip("."),
+            "low": format(min(float(r["low"]) for r in rs), ".10f").rstrip("0").rstrip("."),
+            "close": rs[-1]["close"],
+            "volume": str(sum(float(r["volume"]) for r in rs)),
+        })
+
+    tmpdir = tmp / f"m1_{pair}_{tf}"
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    chunk = tmpdir / "m1_resampled.csv"
+    with chunk.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["timestamp","open","high","low","close","volume"])
+        w.writeheader()
+        w.writerows(result_rows)
+    print(f"[M1-RESAMPLE] {pair} {tf} rows={len(result_rows)}", flush=True)
+    return chunk
+
 def download_native_candles(pair, tf, start, end, out, tmp):
     """Download native H4/D1 .bi5 candles and return a CSV chunk path."""
     if tf not in ("h4", "d1"):
