@@ -1,5 +1,10 @@
 name: FX Data Gap Repair
 on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/native_candles.py"
+      - ".github/workflows/fx-data-gap-repair.yml"
   workflow_dispatch:
     inputs:
       start:
