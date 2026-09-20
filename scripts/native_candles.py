@@ -410,4 +410,14 @@ def download_native_candles(pair, tf, start, end, out, tmp):
             return chunk
 
 
+    # Current/recent months may not have H1/D1 aggregate files yet.
+    # Dukascopy publishes M1 candles per day, so resample those locally first.
+    try:
+        m1_chunk = download_m1_resampled(pair, tf, start, end, out, tmp)
+        if m1_chunk:
+            print(f"[M1-FALLBACK] {pair} {tf} using daily M1 candles", flush=True)
+            return m1_chunk
+    except Exception as e:
+        print(f"[M1-WARN] {pair} {tf} fallback failed: {e}", flush=True)
+
     return False
