@@ -278,6 +278,30 @@ def main():
         ascending=False
     )
     shortlist.to_csv("reports/50pip_candidate_shortlist.csv",index=False,float_format="%.8f")
+
+    focus_conditions=[
+        "price20+price200+macd+volatility",
+        "price200+macd+volatility",
+        "price200+volatility",
+    ]
+    focus=[]
+    for condition in focus_conditions:
+        names=condition.split("+")
+        d=events[(events.timeframe=="h4")&(events.direction=="bear")].copy()
+        hits=all_events[all_events.threshold_pips==100][
+            ["pair","timeframe","direction","event_timestamp"]
+        ].drop_duplicates().assign(hit=True)
+        key=["pair","timeframe","direction","event_timestamp"]
+        d=d.merge(hits,on=key,how="left"); d["hit"]=d.hit.fillna(False)
+        conds=directional_conditions("bear")
+        mask=pd.Series(True,index=d.index)
+        for n in names: mask &= conds[n](d).fillna(False)
+        d=d[(d.event_timestamp.dt.year>=2026)&mask].copy()
+        for pair,g in d.groupby("pair"):
+            focus.append([condition,pair,len(g),float(g.hit.mean()),int(g.hit.sum())])
+    pd.DataFrame(focus,columns=["conditions","pair","oos_samples","oos_hit_rate","oos_hits"]).to_csv(
+        "reports/50pip_focus_pair_detail.csv",index=False,float_format="%.8f"
+    )
     print("continuation_rows",len(res),"oos_candidates",len(sc),"robustness_rows",len(rob))
     if not rob.empty:
         stable=rob[
