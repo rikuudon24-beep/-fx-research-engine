@@ -263,6 +263,21 @@ def main():
     ]
     rob=pd.DataFrame(robustness,columns=rob_cols)
     rob.to_csv("reports/50pip_continuation_robustness.csv",index=False,float_format="%.8f")
+
+    # Build a conservative shortlist before trade simulation.
+    shortlist=rob[
+        (rob.oos_samples>=50)&
+        (rob.validation_samples>=50)&
+        (rob.oos_pairs_n_ge5>=5)&
+        (rob.oos_pair_positive_share>=0.70)&
+        (rob.validation_lift>=1.05)&
+        (rob.oos_lift>=1.20)
+    ].copy()
+    shortlist=shortlist.sort_values(
+        ["oos_wilson95_lower","oos_pair_positive_share","oos_lift","oos_samples"],
+        ascending=False
+    )
+    shortlist.to_csv("reports/50pip_candidate_shortlist.csv",index=False,float_format="%.8f")
     print("continuation_rows",len(res),"oos_candidates",len(sc),"robustness_rows",len(rob))
     if not rob.empty:
         stable=rob[
