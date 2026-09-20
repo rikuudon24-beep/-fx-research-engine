@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/extract_100pip_events.py"
       - "scripts/research_50pip_conditions.py"
+      - "scripts/research_50pip_continuation.py"
       - "data/market/**"
       - ".github/workflows/fx-100pip-research.yml"
   workflow_dispatch:
@@ -16,7 +17,7 @@ permissions:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -28,6 +29,8 @@ jobs:
         run: python scripts/extract_100pip_events.py
       - name: Research indicator conditions
         run: python scripts/research_50pip_conditions.py
+      - name: Research 50pip continuation and OOS
+        run: python scripts/research_50pip_continuation.py
       - name: Upload research reports
         uses: actions/upload-artifact@v4
         with:
@@ -39,10 +42,12 @@ jobs:
             reports/50pip_condition_summary.csv
             reports/50pip_condition_pair_summary.csv
             reports/50pip_feature_dataset.csv
+            reports/50pip_continuation_combinations.csv
+            reports/50pip_continuation_oos.csv
       - name: Commit research datasets
         run: |
           git config user.name "fx-research-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_condition_pair_summary.csv reports/50pip_feature_dataset.csv
-          git diff --cached --quiet || git commit -m "research: extract 50pip events and indicator conditions"
+          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_condition_pair_summary.csv reports/50pip_feature_dataset.csv reports/50pip_continuation_combinations.csv reports/50pip_continuation_oos.csv
+          git diff --cached --quiet || git commit -m "research: add 50pip continuation and OOS datasets"
           git push
