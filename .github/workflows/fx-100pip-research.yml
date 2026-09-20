@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "scripts/extract_100pip_events.py"
+      - "scripts/research_50pip_conditions.py"
       - "data/market/**"
       - ".github/workflows/fx-100pip-research.yml"
   workflow_dispatch:
@@ -15,16 +16,18 @@ permissions:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install research dependencies
-        run: python -m pip install --disable-pip-version-check pandas
+        run: python -m pip install --disable-pip-version-check pandas numpy
       - name: Extract 50pip+ events
         run: python scripts/extract_100pip_events.py
+      - name: Research indicator conditions
+        run: python scripts/research_50pip_conditions.py
       - name: Upload research reports
         uses: actions/upload-artifact@v4
         with:
@@ -33,10 +36,12 @@ jobs:
             reports/50pip_events.csv
             reports/50pip_event_summary.csv
             reports/50pip_data_quality.csv
+            reports/50pip_condition_summary.csv
+            reports/50pip_feature_dataset.csv
       - name: Commit research datasets
         run: |
           git config user.name "fx-research-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv
-          git diff --cached --quiet || git commit -m "research: extract 50pip+ movement events"
+          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_feature_dataset.csv
+          git diff --cached --quiet || git commit -m "research: extract 50pip events and indicator conditions"
           git push
