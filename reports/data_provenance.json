@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-20T09:59:45.848191+00:00",
+  "generated_at_utc": "2026-09-20T21:24:55.292547+00:00",
   "items": [
     {
       "file": "data/market/d1/audjpy.csv",
@@ -55,7 +55,7 @@
       "rows": 1824,
       "first_timestamp": "1609632000000",
       "last_timestamp": "1789776000000",
-      "sha256": "92a7fe8360882d76cec90228643e0249a10581360ca486a54c079df5fd5e628a"
+      "sha256": "6733d8b7490cb4fe28d54758531d432b6d3ceae16103163b79dd727cb96df978"
     },
     {
       "file": "data/market/d1/nzdusd.csv",
