@@ -72,7 +72,7 @@ def event_features(events):
         for pair in PAIRS:
             path=Path("data/market")/tf/f"{pair}.csv"
             df=pd.read_csv(path)
-            df["timestamp"]=pd.to_datetime(df["timestamp"],utc=True,errors="coerce")
+            df["timestamp"]=pd.to_datetime(df["timestamp"],unit="ms",utc=True,errors="coerce")
             df=df.dropna(subset=["timestamp"]).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
             f=features(df)
             z=pd.concat([df[["timestamp","close"]],f],axis=1)
