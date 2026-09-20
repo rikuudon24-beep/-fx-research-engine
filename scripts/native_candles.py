@@ -217,7 +217,10 @@ def download_native_candles(pair, tf, start, end, out, tmp):
             if count == 0:
                 h1_failures += 1
 
-        if h1_rows and not h1_failures:
+        if h1_rows:
+            # Partial H1 coverage is still useful. Return the portion we have;
+            # repair_market_gaps will rescan the remaining range and apply the
+            # next fallback strategy instead of discarding all recovered data.
             buckets = {}
             for r in h1_rows:
                 epoch_ms = int(r["timestamp"])
@@ -310,7 +313,7 @@ def download_native_candles(pair, tf, start, end, out, tmp):
                 w = csv.DictWriter(f, fieldnames=["timestamp","open","high","low","close","volume"])
                 w.writeheader()
                 w.writerows(d1_rows)
-            print(f"[H1-RESAMPLE] {pair} d1 rows={len(d1_rows)}", flush=True)
+            print(f"[H1-RESAMPLE] {pair} d1 rows={len(d1_rows)} failures={h1_failures}", flush=True)
             return chunk
 
 
