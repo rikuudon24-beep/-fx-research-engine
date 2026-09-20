@@ -46,10 +46,11 @@ jobs:
             reports/50pip_continuation_oos.csv
             reports/50pip_continuation_robustness.csv
             reports/50pip_candidate_shortlist.csv
+            reports/50pip_focus_pair_detail.csv
       - name: Commit research datasets
         run: |
           git config user.name "fx-research-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_condition_pair_summary.csv reports/50pip_feature_dataset.csv reports/50pip_continuation_combinations.csv reports/50pip_continuation_oos.csv reports/50pip_continuation_robustness.csv reports/50pip_candidate_shortlist.csv
+          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_condition_pair_summary.csv reports/50pip_feature_dataset.csv reports/50pip_continuation_combinations.csv reports/50pip_continuation_oos.csv reports/50pip_continuation_robustness.csv reports/50pip_candidate_shortlist.csv reports/50pip_focus_pair_detail.csv
           git diff --cached --quiet || git commit -m "research: add 50pip continuation and OOS datasets"
           git push
