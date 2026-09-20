@@ -25,8 +25,10 @@ def features(df):
  "body_ratio":(c-o).abs()/(h-l).replace(0,np.nan)},index=df.index)
 
 def future(s,n,kind):
- r=s.iloc[::-1].rolling(n,min_periods=n); x=(r.max() if kind=="max" else r.min()).iloc[::-1]
- return x.shift(-1)
+ shifted=s.shift(-1)
+ r=shifted.rolling(n,min_periods=n)
+ x=r.max() if kind=="max" else r.min()
+ return x.shift(-(n-1))
 
 def targets(df,pair,tf):
  out=pd.DataFrame(index=df.index); pip=PIP[pair]
