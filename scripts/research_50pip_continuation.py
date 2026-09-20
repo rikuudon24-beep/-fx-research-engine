@@ -204,7 +204,80 @@ def main():
           "all_samples","all_hit_rate","all_lift"]
     sc=pd.DataFrame(scored,columns=cols)
     sc.to_csv("reports/50pip_continuation_oos.csv",index=False,float_format="%.8f")
-    print("continuation_rows",len(res),"oos_candidates",len(sc))
+
+    # Pair-level OOS robustness: check whether a condition survives across multiple pairs,
+    # rather than being driven by one currency pair.
+    robustness=[]
+    for row in sc.itertuples(index=False):
+        d=events[(events.timeframe==row.timeframe)&(events.direction==row.direction)].copy()
+        hits=all_events[(all_events.threshold_pips==row.target_pips)][
+            ["pair","timeframe","direction","event_timestamp"]
+        ].drop_duplicates().assign(hit=True)
+        key=["pair","timeframe","direction","event_timestamp"]
+        d=d.merge(hits,on=key,how="left")
+        d["hit"]=d.hit.fillna(False)
+        d=d[d.event_timestamp.dt.year>=2026].copy()
+        conds=directional_conditions(row.direction)
+        names=row.conditions.split("+")
+        mask=pd.Series(True,index=d.index)
+        for n in names:
+            mask &= conds[n](d).fillna(False)
+        pair_stats=[]
+        for pair,g in d.groupby("pair"):
+            base=float(g["hit"].mean()) if len(g) else np.nan
+            cg=g.loc[mask.loc[g.index]]
+            n=len(cg)
+            if n<5:
+                continue
+            hit=float(cg["hit"].mean())
+            pair_stats.append((pair,n,hit,hit/base if base and np.isfinite(base) else np.nan))
+        pair_count=len(pair_stats)
+        positive=sum(1 for _,_,_,lift in pair_stats if np.isfinite(lift) and lift>=1.0)
+        lifts=[x[3] for x in pair_stats if np.isfinite(x[3])]
+        n_oos=int(mask.sum())
+        hit_oos=float(d.loc[mask,"hit"].mean()) if n_oos else np.nan
+        # Wilson 95% lower bound for the OOS hit rate.
+        if n_oos:
+            z=1.959963984540054
+            denom=1+z*z/n_oos
+            center=(hit_oos+z*z/(2*n_oos))/denom
+            half=z*np.sqrt((hit_oos*(1-hit_oos)/n_oos)+(z*z/(4*n_oos*n_oos)))/denom
+            wilson_low=center-half
+        else:
+            wilson_low=np.nan
+        robustness.append([
+            row.timeframe,row.direction,row.target_pips,row.conditions,
+            row.discovery_samples,row.validation_samples,row.oos_samples,
+            row.discovery_lift,row.validation_lift,row.oos_lift,
+            pair_count,positive,(positive/pair_count if pair_count else np.nan),
+            (min(lifts) if lifts else np.nan),(np.median(lifts) if lifts else np.nan),
+            n_oos,hit_oos,wilson_low
+        ])
+    rob_cols=[
+        "timeframe","direction","target_pips","conditions",
+        "discovery_samples","validation_samples","oos_samples",
+        "discovery_lift","validation_lift","oos_lift",
+        "oos_pairs_n_ge5","oos_pairs_positive_lift","oos_pair_positive_share",
+        "oos_min_pair_lift","oos_median_pair_lift",
+        "oos_recomputed_samples","oos_recomputed_hit_rate","oos_wilson95_lower"
+    ]
+    rob=pd.DataFrame(robustness,columns=rob_cols)
+    rob.to_csv("reports/50pip_continuation_robustness.csv",index=False,float_format="%.8f")
+    print("continuation_rows",len(res),"oos_candidates",len(sc),"robustness_rows",len(rob))
+    if not rob.empty:
+        stable=rob[
+            (rob.oos_samples>=50)&
+            (rob.validation_samples>=50)&
+            (rob.oos_pairs_n_ge5>=3)&
+            (rob.oos_pair_positive_share>=0.60)&
+            (rob.validation_lift>=1.0)&
+            (rob.oos_lift>=1.0)
+        ].copy()
+        print("robust_candidates",len(stable))
+        print(stable.sort_values(
+            ["oos_pair_positive_share","oos_lift","oos_samples"],
+            ascending=False
+        ).head(40).to_string(index=False))
     if not res.empty:
         print("target_base_rates")
         print(res.groupby(["timeframe","direction","target_pips"])["base_rate"].first().to_string())
