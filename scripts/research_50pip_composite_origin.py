@@ -5,10 +5,18 @@ Focus: combinations of independent evidence families rather than a single
 candlestick/indicator. Candidates are evaluated on direct +50 reachability
 from the completed signal candle, with discovery/validation/OOS and pair
 robustness. This is exploratory signal research, not a trade win-rate.
+
+Performance note:
+The first implementation expanded the full Cartesian product of all
+features across 2-4 evidence families before screening. That can create
+millions of candidates and exhaust a GitHub runner. This version first ranks
+features INSIDE DISCOVERY only, keeps the top few causal representatives from
+each evidence family, then builds bounded 2-4-family composites. Validation
+and OOS are never used for candidate selection.
 """
 from pathlib import Path
 import importlib.util
-from itertools import combinations
+from itertools import combinations, product
 import numpy as np
 import pandas as pd
 
@@ -46,26 +54,55 @@ FAMILIES={
 def mask(g,combo):
     m=pd.Series(True,index=g.index)
     for n in combo:
-        if n not in g.columns: return pd.Series(False,index=g.index)
+        if n not in g.columns:
+            return pd.Series(False,index=g.index)
         s=g[n]
         if not pd.api.types.is_bool_dtype(s):
             s=pd.to_numeric(s,errors="coerce").fillna(0).ne(0)
-        else: s=s.fillna(False)
+        else:
+            s=s.fillna(False)
         m &= s
     return m
 
-def candidate_pool(direction="bull"):
-    # Directional upward research only. Keep one feature per evidence family;
-    # allow 2-4 independent families and avoid duplicate/near-duplicate names.
-    families={k:[x for x in v if not x.startswith("mtf_") or direction=="bull"] for k,v in FAMILIES.items()}
+def candidate_pool(data, target, top_k=3, min_n=150):
+    """Build a bounded composite pool using discovery-only feature screening.
+
+    Each evidence family contributes at most one feature to a composite.
+    Top features are selected independently within discovery by lift versus
+    the discovery base rate. This prevents the old multi-million Cartesian
+    explosion while retaining representation from every family.
+    """
+    disc=data[data.timestamp.dt.year<=2024]
+    base=float(disc[target].mean())
+    ranked={}
+    for fam, features in FAMILIES.items():
+        scores=[]
+        for name in features:
+            if name not in data.columns:
+                continue
+            s=data[name]
+            if not pd.api.types.is_bool_dtype(s):
+                s=pd.to_numeric(s,errors="coerce").fillna(0).ne(0)
+            else:
+                s=s.fillna(False)
+            m=s & (data.timestamp.dt.year<=2024)
+            n=int(m.sum())
+            if n < min_n:
+                continue
+            hit=float(data.loc[m,target].mean())
+            lift=hit/base if base else np.nan
+            if np.isfinite(lift):
+                scores.append((name,n,hit,lift))
+        ranked[fam]=sorted(scores,key=lambda x:(x[3],x[1]),reverse=True)[:top_k]
+
+    selected={fam:[x[0] for x in vals] for fam,vals in ranked.items()}
     combos=[]
-    for k in [2,3,4]:
-        for fams in combinations(list(families),k):
-            for picked in __import__("itertools").product(*(families[f] for f in fams)):
-                # Don't combine obvious aliases of the same concept.
-                if len(set(picked))<k: continue
-                combos.append(picked)
-    # Keep research bounded but broad: deterministic order, then explicit high-value hypotheses.
+    for k in (2,3,4):
+        for fams in combinations(selected.keys(),k):
+            for picked in product(*(selected[f] for f in fams)):
+                if len(set(picked))==k:
+                    combos.append(tuple(picked))
+
     explicit=[
       ("mtf_trend_bull","breakout20_up","atr_expand"),
       ("mtf_trend_bull","horizontal_break_up","atr_expand"),
@@ -84,7 +121,10 @@ def candidate_pool(direction="bull"):
     ]
     seen=set(); out=[]
     for c in explicit+combos:
-        if c not in seen: seen.add(c); out.append(c)
+        if c not in seen:
+            seen.add(c); out.append(c)
+    print("DISCOVERY FEATURE SHORTLIST", {k:v for k,v in selected.items()}, flush=True)
+    print("COMPOSITE POOL", len(out), flush=True)
     return out
 
 def wilson(k,n):
@@ -94,46 +134,61 @@ def wilson(k,n):
 
 def main():
     Path("reports").mkdir(exist_ok=True)
-    rows=[]; oosrows=[]; robrows=[]
+    oosrows=[]; robrows=[]
     for tf in TFS:
         print("BUILD",tf,flush=True)
         data=mtf.build_dataset(tf)
-        combos=candidate_pool("bull")
-        cache={c:mask(data,c) for c in combos}
         disc=data[data.timestamp.dt.year<=2024]
         val=data[data.timestamp.dt.year==2025]
         oos=data[data.timestamp.dt.year>=2026]
+
         for h in HORIZONS[tf]:
             target=f"hit50_h{h}"
             base=float(disc[target].mean())
+            print("HORIZON",tf,h,"BASE",base,flush=True)
+            combos=candidate_pool(data,target)
+            cache={c:mask(data,c) for c in combos}
+
             candidates=[]
             for c,m in cache.items():
                 md=m & (data.timestamp.dt.year<=2024)
                 n=int(md.sum())
-                if n<150: continue
-                hit=float(data.loc[md,target].mean()); lift=hit/base if base else np.nan
+                if n<150:
+                    continue
+                hit=float(data.loc[md,target].mean())
+                lift=hit/base if base else np.nan
                 if np.isfinite(lift) and lift>=1.10:
                     candidates.append((c,n,hit,lift))
             candidates=sorted(candidates,key=lambda x:(x[3],x[1]),reverse=True)[:120]
+            print("DISCOVERY CANDIDATES",len(candidates),flush=True)
+
             for c,n,hit,lift in candidates:
                 m=cache[c]
                 vals=[tf,h,"+".join(c),n,hit,lift]
-                for name,g in [("validation",val),("oos",oos)]:
-                    mg=m & (data.timestamp.dt.year==(2025 if name=="validation" else data.timestamp.dt.year))
-                    if name=="oos": mg=m & (data.timestamp.dt.year>=2026)
-                    nn=int(mg.sum()); hh=float(data.loc[mg,target].mean()) if nn else np.nan
-                    b=float(g[target].mean()) if len(g) else np.nan
-                    vals += [nn,hh,hh/b if b else np.nan,wilson(int(data.loc[mg,target].sum()),nn)]
-                oosrows.append(vals)
-                # pair robustness on OOS
+
+                mg=m & (data.timestamp.dt.year==2025)
+                nn=int(mg.sum())
+                hh=float(data.loc[mg,target].mean()) if nn else np.nan
+                b=float(val[target].mean()) if len(val) else np.nan
+                vals += [nn,hh,hh/b if b else np.nan,wilson(int(data.loc[mg,target].sum()),nn)]
+
                 mg=m & (data.timestamp.dt.year>=2026)
+                nn=int(mg.sum())
+                hh=float(data.loc[mg,target].mean()) if nn else np.nan
+                b=float(oos[target].mean()) if len(oos) else np.nan
+                vals += [nn,hh,hh/b if b else np.nan,wilson(int(data.loc[mg,target].sum()),nn)]
+                oosrows.append(vals)
+
                 ps=[]
                 for p,x in data.loc[mg].groupby("pair"):
-                    if len(x)>=5: ps.append(float(x[target].mean()))
+                    if len(x)>=5:
+                        ps.append(float(x[target].mean()))
                 if ps:
                     ob=float(oos[target].mean())
-                    robrows.append([tf,h,"+".join(c),n,int(mg.sum()),lift,vals[8],len(ps),
-                                    sum(x>=ob for x in ps),float(np.mean(ps)),float(min(ps))])
+                    robrows.append([tf,h,"+".join(c),n,int(mg.sum()),lift,
+                                    vals[8],len(ps),sum(x>=ob for x in ps),
+                                    float(np.mean(ps)),float(min(ps))])
+
     oosdf=pd.DataFrame(oosrows,columns=[
       "timeframe","horizon_bars","conditions","discovery_n","discovery_hit","discovery_lift",
       "validation_n","validation_hit","validation_lift","validation_wilson95",
@@ -145,9 +200,13 @@ def main():
     ])
     oosdf.to_csv("reports/50pip_composite_origin_oos.csv",index=False,float_format="%.8f")
     rob.to_csv("reports/50pip_composite_origin_robustness.csv",index=False,float_format="%.8f")
-    top=oosdf.sort_values(["oos_wilson95","oos_lift","oos_n"],ascending=False).head(60)
+    if not oosdf.empty:
+        top=oosdf.sort_values(["oos_wilson95","oos_lift","oos_n"],ascending=False).head(60)
+    else:
+        top=oosdf
     top.to_csv("reports/50pip_composite_origin_shortlist.csv",index=False,float_format="%.8f")
-    print("OOS",len(oosdf),"ROB",len(rob))
-    print(top.head(40).to_string(index=False))
+    print("OOS",len(oosdf),"ROB",len(rob),flush=True)
+    if not top.empty:
+        print(top.head(40).to_string(index=False),flush=True)
 
 if __name__=="__main__": main()
