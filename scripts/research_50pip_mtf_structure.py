@@ -28,6 +28,8 @@ HORIZONS = mod.HORIZONS
 
 BULL_LOCAL = mod.BULL_BASE
 BEAR_LOCAL = mod.BEAR_BASE
+TOOLKIT_BULL = mod.TOOLKIT_BULL
+TOOLKIT_BEAR = mod.TOOLKIT_BEAR
 
 # Higher-timeframe context names are prefixed mtf_.
 MTF_BULL = [
