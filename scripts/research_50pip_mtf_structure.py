@@ -249,9 +249,36 @@ def candidates(direction):
             c = (m,s)
             if c not in seen:
                 seen.add(c); out.append(c)
-    for l in local:
-        for m in mtf:
-            for s in struct:
+
+    # Bounded 3-way search. Instead of the full local x MTF x structure
+    # Cartesian product (thousands of masks per direction), test a curated
+    # set of causal feature families covering trend, trigger, structure and
+    # expansion. This keeps the study broad without exhausting the runner.
+    mtf_core = [x for x in mtf if x in {
+        "mtf_trend_bull","mtf_trend_bear",
+        "mtf_price20_bull","mtf_price20_bear",
+        "mtf_price200_bull","mtf_price200_bear",
+        "mtf_macd_bull","mtf_macd_bear",
+        "mtf_adx_rising","mtf_adx_rising",
+        "mtf_di_strong_bull","mtf_di_strong_bear",
+    }]
+    local_core = [x for x in local if x in {
+        "price20_cross_up","price20_cross_down",
+        "price200_cross_up","price200_cross_down",
+        "macd_cross_up","macd_cross_down",
+        "macd_accel_up","macd_accel_down",
+        "adx_up3","atr_expand","bb_expand",
+        "breakout20_up","breakout20_down",
+    }]
+    struct_core = [x for x in struct if x in {
+        "structure_hh","structure_hl","structure_lh","structure_ll",
+        "breakout20_up","breakout20_down","range_expand",
+        "impulse_bull","impulse_bear","pullback_bull","pullback_bear",
+        "close_near_high","close_near_low",
+    }]
+    for l in local_core:
+        for m in mtf_core:
+            for s in struct_core:
                 c = (l,m,s)
                 if c not in seen:
                     seen.add(c); out.append(c)
