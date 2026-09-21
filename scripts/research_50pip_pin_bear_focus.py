@@ -27,9 +27,9 @@ def build_pair(pair):
 
     # Causal timing/late-entry context. These never inspect future candles.
     c=z.close; h=z.high; l=z.low
-    atr=pd.to_numeric(z.get("atr14"),errors="coerce")
+    atr_col=z["atr14"] if "atr14" in z.columns else pd.Series(np.nan,index=z.index)
+    atr=pd.to_numeric(atr_col,errors="coerce")
     if atr.isna().all():
-        # build_features currently exposes ATR under one of these names.
         for n in ("atr","ATR14","atr_14"):
             if n in z.columns:
                 atr=pd.to_numeric(z[n],errors="coerce"); break
