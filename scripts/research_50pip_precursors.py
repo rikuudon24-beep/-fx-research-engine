@@ -124,9 +124,13 @@ def main():
                         for gap in [1,2,3]:
                             vals=[tf,direction,h,a,b,gap]
                             for g in (disc,gtf[gtf.timestamp.dt.year==2025],gtf[gtf.timestamp.dt.year>=2026]):
-                                aa=g[a].fillna(False)&~g[a].fillna(False).shift(1).fillna(False)
-                                bb=g[b].fillna(False).shift(-gap)
-                                m=aa & bb
+                                a_now=g[a].fillna(False)
+                                b_now=g[b].fillna(False)
+                                a_transition=a_now & ~a_now.shift(1).fillna(False)
+                                b_transition=b_now & ~b_now.shift(1).fillna(False)
+                                # At row t, A must have turned on exactly gap
+                                # completed candles earlier; B turns on now.
+                                m=a_transition.shift(gap).fillna(False) & b_transition
                                 n=int(m.sum())
                                 rate=float(g.loc[m,target].mean()) if n else np.nan
                                 vals += [n,rate]
