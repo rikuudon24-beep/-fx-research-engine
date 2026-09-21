@@ -69,17 +69,22 @@ def build_decay_events(g,pair):
         for a,b in TRANSITIONS:
             level=entry+a*pip
             target=None
-            for j in range(i+1,min(len(g),i+13)):
+            original_horizon=12 if str(g.timeframe.iloc[0])=="h4" else 10
+            for j in range(i+1,min(len(g),i+1+original_horizon)):
                 if float(g.high.iloc[j])>=level:
                     target=j;break
             if target is None: continue
             horizon=WINDOWS["h4" if "h4" in str(g.timeframe.iloc[0]) else "d1"]
             end=min(len(g),target+1+horizon)
-            # Search first decay candle strictly after target.
-            decay=None
+            b_level=entry+b*pip
+            pre_b=end
             for j in range(target+1,end):
-                if any(bool(as_bool(pd.Series([g[n].iloc[j]]))[j*0+0]) for n in []):
-                    pass
+                if float(g.high.iloc[j])>=b_level:
+                    pre_b=j
+                    break
+            # Search first decay candle strictly after target and before +B.
+            decay=None
+            for j in range(target+1,pre_b):
                 cond=(
                     bool(g.get("adx_down3",pd.Series(False,index=g.index)).iloc[j]) or
                     bool(g.get("di_spread_down3",pd.Series(False,index=g.index)).iloc[j]) or
@@ -92,7 +97,7 @@ def build_decay_events(g,pair):
             if decay is None: continue
             future=g.iloc[decay+1:end]
             if len(future)==0: continue
-            next_hit=bool((future.high.astype(float)>=entry+b*pip).any())
+            next_hit=bool((future.high.astype(float)>=b_level).any())
             stall_close=float(g.close.iloc[decay])
             mfe=float((future.high.astype(float).max()-stall_close)/pip)
             mae=float((future.low.astype(float).min()-stall_close)/pip)
