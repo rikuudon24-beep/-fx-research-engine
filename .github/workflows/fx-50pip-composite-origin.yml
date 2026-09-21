@@ -1,0 +1,43 @@
+name: FX 50pip Composite Origin Research
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/research_50pip_composite_origin.py"
+      - "scripts/research_50pip_direct_entry.py"
+      - "scripts/research_50pip_mtf_structure.py"
+      - "data/market/**"
+      - ".github/workflows/fx-50pip-composite-origin.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pandas numpy
+      - name: Run composite origin research
+        run: python -u scripts/research_50pip_composite_origin.py
+      - name: Upload research reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: 50pip-composite-origin-research
+          path: |
+            reports/50pip_composite_origin_oos.csv
+            reports/50pip_composite_origin_robustness.csv
+            reports/50pip_composite_origin_shortlist.csv
+      - name: Commit research reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/50pip_composite_origin_oos.csv reports/50pip_composite_origin_robustness.csv reports/50pip_composite_origin_shortlist.csv
+          git diff --cached --quiet || git commit -m "research: save composite origin results"
+          git push
