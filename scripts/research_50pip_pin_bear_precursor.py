@@ -15,7 +15,10 @@ BASE=["price20_bear","price200_bear","trend_bear","volatility","body"]
 TRANS=["adx_up3","macd_accel_bear","rsi_down1","di_cross_down","ema20_slope_down","price20_cross_down","price200_cross_down","atr_expand","bb_expand","range_expand","breakout_down20","retest_down","false_breakout_down"]
 
 def build(p):
-    z=mod.build_pair(p).copy()
+    df=mod.load_market("h4",p)
+    z=mod.build_features(df).copy()
+    labels=mod.add_labels(df,p,"h4")
+    z=pd.concat([df, z, labels],axis=1)
     if "pin_bear" not in z: raise RuntimeError("pin_bear missing")
     return z
 
