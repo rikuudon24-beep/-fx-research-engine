@@ -44,11 +44,11 @@ MTF_BEAR = [
 ]
 
 STRUCT_BULL = [
-    "structure_hh","structure_hl","breakout20_up","range_expand",
+    "structure_hh","structure_hl","structure_breakout20_up","range_expand",
     "close_near_high","impulse_bull","pullback_bull","distance_high_ok",
 ]
 STRUCT_BEAR = [
-    "structure_lh","structure_ll","breakout20_down","range_expand",
+    "structure_lh","structure_ll","structure_breakout20_down","range_expand",
     "close_near_low","impulse_bear","pullback_bear","distance_low_ok",
 ]
 
@@ -76,8 +76,8 @@ def structure_features(df):
         "structure_hl": l > l.shift(1),
         "structure_lh": h < h.shift(1),
         "structure_ll": ll,
-        "breakout20_up": c > prev_h20,
-        "breakout20_down": c < prev_l20,
+        "structure_breakout20_up": c > prev_h20,
+        "structure_breakout20_down": c < prev_l20,
         "range_expand": rng > rng.shift(3)*1.20,
         "close_near_high": (h-c)/rng <= .20,
         "close_near_low": (c-l)/rng <= .20,
@@ -203,6 +203,9 @@ def build_dataset(tf):
 
     return pd.concat(rows, ignore_index=True)
 
+# Keep feature namespaces unique: local direct-entry and structure features
+# must never create duplicate DataFrame column names, because g[n] would
+# otherwise return a DataFrame and Series boolean-mask operations can fail.
 def mask(g, names):
     m = pd.Series(True, index=g.index)
     for n in names:
@@ -272,7 +275,7 @@ def candidates(direction):
     }]
     struct_core = [x for x in struct if x in {
         "structure_hh","structure_hl","structure_lh","structure_ll",
-        "breakout20_up","breakout20_down","range_expand",
+        "structure_breakout20_up","structure_breakout20_down","range_expand",
         "impulse_bull","impulse_bear","pullback_bull","pullback_bear",
         "close_near_high","close_near_low",
     }]
