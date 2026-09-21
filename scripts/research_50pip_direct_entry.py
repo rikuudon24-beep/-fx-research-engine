@@ -117,6 +117,33 @@ def build_features(df):
     channel_rng=(channel_hi-channel_lo).replace(0,np.nan)
     channel_pos=(c-channel_lo)/channel_rng
 
+    # Elliott-wave-inspired causal structure proxies.
+    # Exact Elliott labeling is discretionary; here we encode reproducible
+    # swing/impulse/retracement relationships using only completed bars.
+    swing_hi5=h.shift(1).rolling(5).max()
+    swing_lo5=l.shift(1).rolling(5).min()
+    swing_hi10=h.shift(1).rolling(10).max()
+    swing_lo10=l.shift(1).rolling(10).min()
+    up_impulse=(c>swing_hi5)&(c>o)
+    down_impulse=(c<swing_lo5)&(c<o)
+    prior_up_leg=(c.shift(1)-c.shift(5))
+    prior_down_leg=(c.shift(5)-c.shift(1))
+    retrace_from_hi=(swing_hi10-c)/(swing_hi10-swing_lo10).replace(0,np.nan)
+    retrace_from_lo=(c-swing_lo10)/(swing_hi10-swing_lo10).replace(0,np.nan)
+    # Approximate wave-2/4 style pullbacks and wave-3/5 style impulses.
+    elliott_wave2_bull=(retrace_from_hi>=.382)&(retrace_from_hi<=.618)&(prior_up_leg>0)
+    elliott_wave4_bull=(retrace_from_hi>=.236)&(retrace_from_hi<=.382)&(prior_up_leg>0)
+    elliott_wave3_bull=up_impulse&(prior_up_leg>0)&(atr>atr.shift(3))
+    elliott_wave5_bull=up_impulse&(c>swing_hi10)&(c.shift(1)>c.shift(2))
+    elliott_wave2_bear=(retrace_from_lo>=.382)&(retrace_from_lo<=.618)&(prior_down_leg>0)
+    elliott_wave4_bear=(retrace_from_lo>=.236)&(retrace_from_lo<=.382)&(prior_down_leg>0)
+    elliott_wave3_bear=down_impulse&(prior_down_leg>0)&(atr>atr.shift(3))
+    elliott_wave5_bear=down_impulse&(c<swing_lo10)&(c.shift(1)<c.shift(2))
+    elliott_impulse_bull=elliott_wave3_bull|elliott_wave5_bull
+    elliott_impulse_bear=elliott_wave3_bear|elliott_wave5_bear
+    elliott_pullback_bull=elliott_wave2_bull|elliott_wave4_bull
+    elliott_pullback_bear=elliott_wave2_bear|elliott_wave4_bear
+
     # Shape proxies from OHLC rather than subjective visual pattern labels.
     compression=(h-l).rolling(5).mean()/(h-l).rolling(20).mean().replace(0,np.nan)
     triangle_proxy=(h.shift(1).rolling(10).max()-h.shift(1).rolling(10).min())/(l.shift(1).rolling(10).max()-l.shift(1).rolling(10).min()).replace(0,np.nan)
@@ -192,6 +219,12 @@ def build_features(df):
         "triangle_breakout_up":(compression<.75)&(c>channel_hi),
         "triangle_breakout_down":(compression<.75)&(c<channel_lo),
         "ellipse_compression":compression<.65,
+        "elliott_wave2_bull":elliott_wave2_bull, "elliott_wave3_bull":elliott_wave3_bull,
+        "elliott_wave4_bull":elliott_wave4_bull, "elliott_wave5_bull":elliott_wave5_bull,
+        "elliott_impulse_bull":elliott_impulse_bull, "elliott_pullback_bull":elliott_pullback_bull,
+        "elliott_wave2_bear":elliott_wave2_bear, "elliott_wave3_bear":elliott_wave3_bear,
+        "elliott_wave4_bear":elliott_wave4_bear, "elliott_wave5_bear":elliott_wave5_bear,
+        "elliott_impulse_bear":elliott_impulse_bear, "elliott_pullback_bear":elliott_pullback_bear,
 
         # Change / transition features: what changed immediately before entry.
         "rsi_up1":rsi.diff(1)>3, "rsi_down1":rsi.diff(1)<-3,
@@ -276,6 +309,7 @@ TOOLKIT_BULL=[
     "horizontal_resistance_near","horizontal_support_near","horizontal_break_up",
     "vertical_session","vertical_day_open","vertical_week_open",
     "rectangle_range","triangle_breakout_up","ellipse_compression",
+    "elliott_wave2_bull","elliott_wave3_bull","elliott_wave4_bull","elliott_wave5_bull","elliott_impulse_bull","elliott_pullback_bull",
     "compression","shape_triangle_proxy"
 ]
 TOOLKIT_BEAR=[
@@ -291,6 +325,7 @@ TOOLKIT_BEAR=[
     "horizontal_resistance_near","horizontal_support_near","horizontal_break_down",
     "vertical_session","vertical_day_open","vertical_week_open",
     "rectangle_range","triangle_breakout_down","ellipse_compression",
+    "elliott_wave2_bear","elliott_wave3_bear","elliott_wave4_bear","elliott_wave5_bear","elliott_impulse_bear","elliott_pullback_bear",
     "compression","shape_triangle_proxy"
 ]
 
