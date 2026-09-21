@@ -73,10 +73,10 @@ def first_hit_after(highs, start, target, pip):
         if highs.iloc[j] >= level:return j
     return None
 
-def enrich_chain(g, horizon):
+def enrich_chain(g, horizon, pair):
     # Event-level first-hit bars from each signal candle.
     g=g.sort_values("timestamp").reset_index(drop=True)
-    pip=0.01 if g.pair.iloc[0].endswith("jpy") else 0.0001
+    pip=0.01 if pair.endswith("jpy") else 0.0001
     out=[]
     for i,row in g.iterrows():
         e=float(row.close)
@@ -142,7 +142,7 @@ def main():
         events=[]
         for pair,g in data.groupby("pair",sort=False):
             # Only need feature columns + OHLC. Recompute hits from raw dataset.
-            ev=enrich_chain(g[["timestamp","open","high","low","close"]].copy(),h)
+            ev=enrich_chain(g[["timestamp","open","high","low","close"]].copy(),h,pair)
             ev["pair"]=pair
             # Restore feature rows by index alignment.
             gg=g.reset_index(drop=True)
