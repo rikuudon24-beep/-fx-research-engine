@@ -15,10 +15,17 @@ mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 
 PAIRS=mod.PAIRS; TFS=mod.TFS; HORIZONS=mod.HORIZONS
 
+def feature_mask(s):
+    """Normalize bool/numeric chart features to a causal boolean mask."""
+    if pd.api.types.is_bool_dtype(s):
+        return s.fillna(False)
+    return pd.to_numeric(s, errors="coerce").fillna(0).ne(0)
+
 def effect(g, feature, target):
     if feature not in g.columns: return None
-    x=g[g[feature].fillna(False)]
-    y=g[~g[feature].fillna(False)]
+    mask=feature_mask(g[feature])
+    x=g[mask]
+    y=g[~mask]
     if len(x)<100 or len(y)<100: return None
     hx=float(x[target].mean()); hy=float(y[target].mean())
     return len(x),len(y),hx,hy,hx-hy,hx/hy if hy else np.nan
@@ -78,7 +85,7 @@ def main():
                 base=float(disc[target].mean())
                 candidates=[]
                 for a in features:
-                    sa=disc[disc[a].fillna(False)] if a in disc.columns else disc.iloc[0:0]
+                    sa=disc[feature_mask(disc[a])] if a in disc.columns else disc.iloc[0:0]
                     if len(sa)<150: continue
                     ha=float(sa[target].mean())
                     if ha/base>=1.10:
@@ -90,8 +97,8 @@ def main():
                         if b==a or b not in all_df.columns: continue
                         vals=[tf,direction,h,a,b]
                         for g in (disc,all_df[all_df.timestamp.dt.year==2025],all_df[all_df.timestamp.dt.year>=2026]):
-                            sa=g[g[a].fillna(False)]
-                            sb=sa[sa[b].fillna(False)]
+                            sa=g[feature_mask(g[a])]
+                            sb=sa[feature_mask(sa[b])]
                             if len(sb)<50:
                                 vals += [len(sb),np.nan,np.nan]
                             else:
