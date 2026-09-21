@@ -1,15 +1,22 @@
 name: FX Pin Bear Precursor Research
+
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "scripts/research_50pip_pin_bear_precursor.py"
       - "scripts/research_50pip_direct_entry.py"
-      - "data/**"
+      - "data/market/**"
       - ".github/workflows/fx-pin-bear-precursor.yml"
+
+permissions:
+  contents: write
+
 concurrency:
   group: fx-pin-bear-precursor
   cancel-in-progress: false
+
 jobs:
   precursor:
     runs-on: ubuntu-latest
@@ -17,12 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
-        with: {python-version: "3.12"}
+        with:
+          python-version: "3.12"
       - name: Install dependencies
         run: python -m pip install --disable-pip-version-check pandas numpy
       - name: Run precursor research
         run: python -u scripts/research_50pip_pin_bear_precursor.py
-      - name: Upload reports
+      - name: Upload research reports
         uses: actions/upload-artifact@v4
         with:
           name: 50pip-pin-bear-precursor
@@ -31,13 +39,11 @@ jobs:
             reports/50pip_pin_bear_precursor_sequences.csv
             reports/50pip_pin_bear_precursor_summary.csv
       - name: Persist reports
-        if: success()
-        env:\n          GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name "fx-research-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add reports/50pip_pin_bear_precursor_*.csv
-          git diff --cached --quiet || git commit -m "research: save pin bear precursor results"
+          git diff --cached --quiet || git commit -m "research: save pin-bear precursor results"
           git fetch origin main
-          git rebase origin/main || true
-          git push origin HEAD:main
+          git rebase origin/main
+          git push
