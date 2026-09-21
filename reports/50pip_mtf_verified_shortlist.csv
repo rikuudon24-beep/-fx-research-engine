@@ -1,0 +1,13 @@
+timeframe,direction,horizon_bars,conditions,role,oos_samples,oos_lift,oos_wilson95_lower,oos_pairs_n_ge5,oos_pairs_above_oos_base,oos_pair_hit_mean,oos_min_pair_hit,notes
+h4,bull,1,atr_expand+mtf_volatility,entry_timing_candidate,172,4.56983277,0.10042961,11,7,0.15344382,0.0,"Strong OOS lift; pair-level minimum is zero, so not yet universal."
+h4,bull,1,atr_expand+mtf_trend_bull+range_expand,entry_timing_candidate,292,3.23018316,0.07291798,11,7,0.08987561,0.0,"MTF trend + local volatility/structure; pair-level minimum is zero."
+h4,bull,1,atr_expand+mtf_adx25,entry_timing_candidate,262,3.00004289,0.06546883,12,6,0.08841820,0.0,"MTF ADX confirmation; pair-level minimum is zero."
+h4,bull,1,adx_up3+atr_expand,baseline_entry_candidate,330,2.76294859,0.06188288,12,7,0.07910477,0.0,"Local momentum/volatility without MTF; useful comparator."
+h4,bull,1,volatility+atr_expand,baseline_entry_candidate,491,2.43327307,0.05690261,12,7,0.07781376,0.0,"Local volatility expansion comparator."
+h4,bear,6,atr_expand+mtf_volatility,continuation_candidate,172,1.97075768,0.39215228,11,10,0.48070345,0.14285714,"Short-side directional label; all qualifying pairs had nonzero OOS hit."
+h4,bear,12,atr_expand+mtf_volatility,continuation_candidate,172,1.58811057,0.50667909,11,10,0.60070315,0.28571429,"Short continuation over 12 H4 bars."
+h4,bear,24,atr_expand+mtf_volatility,continuation_candidate,172,1.39760609,0.61929553,11,11,0.70929002,0.5,"Short continuation over 24 H4 bars; all qualifying pairs above base."
+d1,bear,1,atr_expand+mtf_adx25,entry_timing_candidate,125,2.22993414,0.38663060,11,9,0.41329129,0.0,"D1 short timing candidate; pair-level minimum is zero."
+d1,bear,3,atr_expand+range_expand,continuation_candidate,103,1.67178592,0.59450020,9,8,0.71801655,0.2,"D1 short continuation; no MTF factor in this condition."
+d1,bull,3,volatility+adx_up3,continuation_candidate,189,1.42792876,0.55884176,12,11,0.61380074,0.11111111,"D1 long continuation; all qualifying pairs nonzero."
+h4,bull,24,mtf_volatility+distance_high_ok,continuation_candidate,2384,1.17904419,0.61469255,12,7,0.61291425,0.10989011,"Large OOS sample; modest lift but strong lower bound."
