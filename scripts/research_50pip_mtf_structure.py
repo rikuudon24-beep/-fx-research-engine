@@ -317,6 +317,7 @@ def wilson_lower(k,n,z=1.959963984540054):
 
 def main():
     Path("reports").mkdir(exist_ok=True)
+    print("START MTF/structure research")
     datasets = {tf: build_dataset(tf) for tf in TFS}
     rows = []
     scored = []
