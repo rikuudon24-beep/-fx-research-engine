@@ -38,4 +38,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add reports/50pip_chart_toolkit_effects.csv reports/50pip_chart_toolkit_incremental.csv
           git diff --cached --quiet || git commit -m "research: add chart toolkit reports"
-          git push
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main && git push && exit 0
+            git rebase --abort || true
+            sleep $((attempt * 5))
+          done
+          exit 1
