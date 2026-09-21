@@ -75,7 +75,7 @@ def main():
         for direction in ("bull","bear"):
             features=BULL_BASE if direction=="bull" else BEAR_BASE
             for h in HORIZONS[tf]:
-                target=f"hit50_h{h}"
+                target=f"hit50_h{h}" if direction=="bull" else f"hit_short50_h{h}"
                 disc=tfdf[tfdf.timestamp.dt.year<=2024]
                 candidates=[]
                 for a in features:
