@@ -11,7 +11,6 @@ on:
       - "scripts/research_50pip_trade_path.py"
       - "scripts/research_50pip_direct_entry.py"
       - "scripts/research_50pip_entry_effects.py"
-      - "scripts/research_50pip_mtf_structure.py"
       - "data/market/**"
       - ".github/workflows/fx-100pip-research.yml"
 
@@ -41,8 +40,6 @@ jobs:
         run: python scripts/research_50pip_direct_entry.py
       - name: Research entry feature and transition effects
         run: python scripts/research_50pip_entry_effects.py
-      - name: Research multi-timeframe and price structure
-        run: python scripts/research_50pip_mtf_structure.py
       - name: Upload research reports
         uses: actions/upload-artifact@v4
         with:
@@ -66,13 +63,10 @@ jobs:
             reports/50pip_direct_entry_robustness.csv
             reports/50pip_entry_feature_effects.csv
             reports/50pip_entry_incremental_effects.csv
-            reports/50pip_mtf_structure_conditions.csv
-            reports/50pip_mtf_structure_oos.csv
-            reports/50pip_mtf_structure_robustness.csv
       - name: Commit research datasets
         run: |
           git config user.name "fx-research-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_condition_pair_summary.csv reports/50pip_feature_dataset.csv reports/50pip_continuation_combinations.csv reports/50pip_continuation_oos.csv reports/50pip_continuation_robustness.csv reports/50pip_candidate_shortlist.csv reports/50pip_focus_pair_detail.csv reports/50pip_trade_path_focus.csv reports/50pip_trade_path_focus_summary.csv reports/50pip_direct_entry_conditions.csv reports/50pip_direct_entry_oos.csv reports/50pip_direct_entry_robustness.csv reports/50pip_entry_feature_effects.csv reports/50pip_entry_incremental_effects.csv reports/50pip_mtf_structure_conditions.csv reports/50pip_mtf_structure_oos.csv reports/50pip_mtf_structure_robustness.csv
-          git diff --cached --quiet || git commit -m "research: add multi-timeframe structure datasets"
+          git add reports/50pip_events.csv reports/50pip_event_summary.csv reports/50pip_data_quality.csv reports/50pip_condition_summary.csv reports/50pip_condition_pair_summary.csv reports/50pip_feature_dataset.csv reports/50pip_continuation_combinations.csv reports/50pip_continuation_oos.csv reports/50pip_continuation_robustness.csv reports/50pip_candidate_shortlist.csv reports/50pip_focus_pair_detail.csv reports/50pip_trade_path_focus.csv reports/50pip_trade_path_focus_summary.csv reports/50pip_direct_entry_conditions.csv reports/50pip_direct_entry_oos.csv reports/50pip_direct_entry_robustness.csv reports/50pip_entry_feature_effects.csv reports/50pip_entry_incremental_effects.csv
+          git diff --cached --quiet || git commit -m "research: update core research datasets"
           git push
