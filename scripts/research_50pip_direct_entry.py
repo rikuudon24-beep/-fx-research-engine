@@ -56,6 +56,10 @@ def build_features(df):
     sma20=c.rolling(20).mean(); sma50=c.rolling(50).mean(); sma200=c.rolling(200).mean()
     bb_std=sd
     bb_upper_band=mid+2*bb_std; bb_lower_band=mid-2*bb_std
+    # Super Bollinger-style expansion/position proxies.
+    bb3_upper=mid+3*bb_std; bb3_lower=mid-3*bb_std
+    bb_width=bbwidth
+    bb_squeeze=bb_width < bb_width.rolling(100).quantile(.20)
 
     tenkan=(h.rolling(9).max()+l.rolling(9).min())/2
     kijun=(h.rolling(26).max()+l.rolling(26).min())/2
@@ -76,6 +80,35 @@ def build_features(df):
     fib236=fib_hi-fib_rng*.236; fib382=fib_hi-fib_rng*.382
     fib500=fib_hi-fib_rng*.500; fib618=fib_hi-fib_rng*.618; fib786=fib_hi-fib_rng*.786
     fib_pos=(c-fib_lo)/fib_rng
+
+    # Fibonacci time-zone / fan / arc proxies. These are intentionally
+    # deterministic time/price geometry derived from prior completed swings.
+    swing_age=np.arange(len(df),dtype=float)
+    fib_time_5=(np.arange(len(df)) % 5 == 0)
+    fib_time_8=(np.arange(len(df)) % 8 == 0)
+    fib_time_13=(np.arange(len(df)) % 13 == 0)
+    fib_time_zone=fib_time_5|fib_time_8|fib_time_13
+    fan_base=(fib_hi-fib_lo).replace(0,np.nan)
+    fan_ratio=(c-fib_lo)/fan_base
+    fib_fan_up=fan_ratio > .618
+    fib_fan_down=fan_ratio < .382
+    fib_arc_mid=((fib_hi+fib_lo)/2)
+    fib_arc_bull=c>fib_arc_mid
+    fib_arc_bear=c<fib_arc_mid
+
+    # Horizontal-line support/resistance proxies from prior completed pivots.
+    horizontal_resistance=fib_hi
+    horizontal_support=fib_lo
+    horizontal_break_up=c>horizontal_resistance
+    horizontal_break_down=c<horizontal_support
+    near_horizontal_resistance=(horizontal_resistance-c)/atr < .25
+    near_horizontal_support=(c-horizontal_support)/atr < .25
+
+    # Vertical-line/time separators as causal calendar/time buckets.
+    hours=df["timestamp"].dt.hour
+    vertical_session=(hours.isin([0,6,7,8,12,13,14,15,16])).astype(bool)
+    vertical_day_open=(hours==0)
+    vertical_week_open=(df["timestamp"].dt.dayofweek==0)&(hours==0)
 
     # Objective trendline/channel proxies: regression slope and normalized
     # channel position over the preceding 20 completed candles.
@@ -102,9 +135,14 @@ def build_features(df):
         "adx25":adx>25, "adx_rising":adx.diff()>0,
         "di_bull":pdi>mdi, "di_bear":mdi>pdi,
         "di_strong_bull":(pdi-mdi)>5, "di_strong_bear":(mdi-pdi)>5,
+        "dmi_adx_bull":(adx>25)&(pdi>mdi), "dmi_adx_bear":(adx>25)&(mdi>pdi),
+        "dmi_adx_strong_bull":(adx.diff()>0)&(pdi>mdi), "dmi_adx_strong_bear":(adx.diff()>0)&(mdi>pdi),
         "volatility":atr_pct>=.7,
         "bb_bull":bbpos>.5, "bb_bear":bbpos<.5,
         "bb_upper":bbpos>=.8, "bb_lower":bbpos<=.2,
+        "superbb_bull":c>bb3_upper, "superbb_bear":c<bb3_lower,
+        "superbb_inside":(c<=bb3_upper)&(c>=bb3_lower),
+        "superbb_squeeze":bb_squeeze, "superbb_expand":bb_width/bb_width.shift(3)>1.15,
         "body_bull":(c>o)&(body>.6), "body_bear":(c<o)&(body>.6),
 
         # SMA / Ichimoku / Stochastic / RCI / Fibonacci / line-channel proxies.
@@ -128,6 +166,17 @@ def build_features(df):
         "fib_above382":c>fib382, "fib_above500":c>fib500,
         "fib_above618":c>fib618, "fib_below382":c<fib382,
         "fib_below500":c<fib500, "fib_below618":c<fib618,
+        "fib_time_zone":fib_time_zone, "fib_time_5":fib_time_5,
+        "fib_time_8":fib_time_8, "fib_time_13":fib_time_13,
+        "fib_fan_up":fib_fan_up, "fib_fan_down":fib_fan_down,
+        "fib_arc_bull":fib_arc_bull, "fib_arc_bear":fib_arc_bear,
+        "horizontal_resistance_near":near_horizontal_resistance,
+        "horizontal_support_near":near_horizontal_support,
+        "horizontal_break_up":horizontal_break_up,
+        "horizontal_break_down":horizontal_break_down,
+        "vertical_session":vertical_session,
+        "vertical_day_open":vertical_day_open,
+        "vertical_week_open":vertical_week_open,
         "fib_retrace38_bull":(c>=fib382)&(c<=fib500),
         "fib_retrace62_bull":(c>=fib618)&(c<=fib786),
         "fib_retrace38_bear":(c<=fib618)&(c>=fib500),
@@ -138,6 +187,10 @@ def build_features(df):
         "channel_breakout_up":c>channel_hi, "channel_breakout_down":c<channel_lo,
         "compression":compression<.75,
         "shape_triangle_proxy":(compression<.75)&(channel_rng/channel_lo.replace(0,np.nan)<.03),
+        "rectangle_range":(channel_pos>.15)&(channel_pos<.85)&(compression>.80),
+        "triangle_breakout_up":(compression<.75)&(c>channel_hi),
+        "triangle_breakout_down":(compression<.75)&(c<channel_lo),
+        "ellipse_compression":compression<.65,
 
         # Change / transition features: what changed immediately before entry.
         "rsi_up1":rsi.diff(1)>3, "rsi_down1":rsi.diff(1)<-3,
@@ -209,21 +262,34 @@ BEAR_BASE=[
 
 
 TOOLKIT_BULL=[
+    # Every item shown in the user's chart-tool list is represented.
     "sma20_bull","sma50_bull","sma200_bull","sma_stack_bull",
     "ichimoku_bull","ichimoku_tk_bull","ichimoku_cloud_bull",
+    "bb_bull","bb_upper","superbb_bull","superbb_squeeze","superbb_expand",
     "stoch_bull","stoch_cross_up","stoch_recover_up",
     "rci_bull","rci_strong_bull","rci_cross_up",
+    "dmi_adx_bull","dmi_adx_strong_bull",
     "fib_above382","fib_above500","fib_above618","fib_retrace38_bull","fib_retrace62_bull",
+    "fib_time_zone","fib_time_5","fib_time_8","fib_time_13","fib_fan_up","fib_arc_bull",
     "trendline_up","channel_upper","channel_mid_bull","channel_breakout_up",
+    "horizontal_resistance_near","horizontal_support_near","horizontal_break_up",
+    "vertical_session","vertical_day_open","vertical_week_open",
+    "rectangle_range","triangle_breakout_up","ellipse_compression",
     "compression","shape_triangle_proxy"
 ]
 TOOLKIT_BEAR=[
     "sma20_bear","sma50_bear","sma200_bear","sma_stack_bear",
     "ichimoku_bear","ichimoku_tk_bear","ichimoku_cloud_bear",
+    "bb_bear","bb_lower","superbb_bear","superbb_squeeze","superbb_expand",
     "stoch_bear","stoch_cross_down","stoch_fall_down",
     "rci_bear","rci_strong_bear","rci_cross_down",
+    "dmi_adx_bear","dmi_adx_strong_bear",
     "fib_below382","fib_below500","fib_below618","fib_retrace38_bear","fib_retrace62_bear",
+    "fib_time_zone","fib_time_5","fib_time_8","fib_time_13","fib_fan_down","fib_arc_bear",
     "trendline_down","channel_lower","channel_mid_bear","channel_breakout_down",
+    "horizontal_resistance_near","horizontal_support_near","horizontal_break_down",
+    "vertical_session","vertical_day_open","vertical_week_open",
+    "rectangle_range","triangle_breakout_down","ellipse_compression",
     "compression","shape_triangle_proxy"
 ]
 
