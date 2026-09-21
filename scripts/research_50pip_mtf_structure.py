@@ -90,17 +90,28 @@ def structure_features(df):
     }, index=df.index)
     return f
 
-def aligned_mtf(local_df, mtf_df, mtf_features):
-    # Candle timestamps represent candle starts in the repository's market
-    # data. Entry is evaluated at local candle close, so exact timestamp
-    # matches would still be an unfinished opposite-timeframe candle.
+def aligned_mtf(local_df, mtf_df, mtf_features, local_tf, mtf_tf):
+    # Repository timestamps are candle starts. A local signal is evaluated
+    # at the local candle close, so the opposite-timeframe candle must have
+    # COMPLETED by that close. This prevents using a still-forming D1 candle
+    # inside an H4 signal (and vice versa).
+    delta = {
+        "h4": pd.Timedelta(hours=4),
+        "d1": pd.Timedelta(days=1),
+    }
     left = local_df[["timestamp"]].copy().sort_values("timestamp")
+    left["entry_close"] = left["timestamp"] + delta[local_tf]
+
     right = pd.concat([mtf_df[["timestamp"]], mtf_features], axis=1).copy()
-    right = right.sort_values("timestamp")
+    right["completed_at"] = right["timestamp"] + delta[mtf_tf]
+    right = right.sort_values("completed_at")
     right = right.rename(columns={c:f"mtf_{c}" for c in mtf_features.columns})
+
     merged = pd.merge_asof(
-        left, right, on="timestamp", direction="backward",
-        allow_exact_matches=False
+        left, right,
+        left_on="entry_close", right_on="completed_at",
+        direction="backward",
+        allow_exact_matches=True,
     )
     return merged[mtf_features.columns.map(lambda c:f"mtf_{c}")]
 
@@ -175,7 +186,7 @@ def build_dataset(tf):
         df = raw[pair]
         local = mod.build_features(df)
         structure = structure_features(df)
-        aligned = aligned_mtf(df, mtf_raw[pair], mtf_feat[pair])
+        aligned = aligned_mtf(df, mtf_raw[pair], mtf_feat[pair], tf, mtf_tf)
 
         # Cross-pair context is computed on a shared timestamp grid.
         cross = normalized_cross_context(close_panel, pair, tf)
@@ -283,43 +294,61 @@ def main():
     rows = []
     scored = []
     for tf, all_df in datasets.items():
+        # Cache candidate lists and boolean masks once per direction. The old
+        # implementation rebuilt the same masks for every horizon, which made
+        # the workflow much slower and more memory-hungry than necessary.
         for direction in ("bull","bear"):
             target_horizons = HORIZONS[tf]
-            for h in target_horizons:
-                target = f"hit50_h{h}"
-                base = float(all_df[target].mean())
-                for combo in candidates(direction):
-                    sub = all_df.loc[mask(all_df, combo)]
-                    if len(sub) < 100: continue
-                    hit = float(sub[target].mean())
-                    rows.append([
-                        tf,direction,h,"+".join(combo),len(sub),base,hit,
-                        hit-base,hit/base if base else np.nan
-                    ])
+            combos = candidates(direction)
+            mask_cache = {}
+            for combo in combos:
+                m = mask(all_df, combo)
+                if int(m.sum()) >= 100:
+                    mask_cache[combo] = m
 
             disc = all_df[all_df.timestamp.dt.year <= 2024]
             val = all_df[all_df.timestamp.dt.year == 2025]
             oos = all_df[all_df.timestamp.dt.year >= 2026]
+
             for h in target_horizons:
-                target=f"hit50_h{h}"
-                base=float(disc[target].mean())
-                cand=[]
-                for combo in candidates(direction):
-                    sub=disc.loc[mask(disc,combo)]
-                    if len(sub)<150: continue
-                    hit=float(sub[target].mean())
-                    lift=hit/base if base else np.nan
-                    if np.isfinite(lift) and lift>=1.10:
-                        cand.append((combo,len(sub),hit,lift))
-                cand=sorted(cand,key=lambda x:(x[3],x[1]),reverse=True)[:80]
+                target = f"hit50_h{h}"
+                base_all = float(all_df[target].mean())
+                for combo, m in mask_cache.items():
+                    n = int(m.sum())
+                    if n < 100:
+                        continue
+                    hit = float(all_df.loc[m, target].mean())
+                    rows.append([
+                        tf,direction,h,"+".join(combo),n,base_all,hit,
+                        hit-base_all,hit/base_all if base_all else np.nan
+                    ])
+
+                base = float(disc[target].mean())
+                cand = []
+                for combo, m in mask_cache.items():
+                    md = m & (all_df.timestamp.dt.year <= 2024)
+                    n = int(md.sum())
+                    if n < 150:
+                        continue
+                    hit = float(all_df.loc[md, target].mean())
+                    lift = hit/base if base else np.nan
+                    if np.isfinite(lift) and lift >= 1.10:
+                        cand.append((combo,n,hit,lift))
+                cand = sorted(cand,key=lambda x:(x[3],x[1]),reverse=True)[:80]
+
                 for combo,dn,dh,dl in cand:
+                    m = mask_cache[combo]
                     vals=[tf,direction,h,"+".join(combo),dn,dh,dl]
-                    for name,g in (("validation",val),("oos",oos)):
-                        sub=g.loc[mask(g,combo)]
-                        n=len(sub); hit=float(sub[target].mean()) if n else np.nan
+                    for g in (val,oos):
+                        mg = m & (all_df.timestamp.dt.year == (2025 if g is val else 2026))
+                        # OOS is 2026+, not only 2026.
+                        if g is oos:
+                            mg = m & (all_df.timestamp.dt.year >= 2026)
+                        n=int(mg.sum())
+                        hit=float(all_df.loc[mg,target].mean()) if n else np.nan
                         b=float(g[target].mean()) if len(g) else np.nan
                         vals += [n,hit,hit/b if b else np.nan,
-                                 wilson_lower(int(sub[target].sum()),n)]
+                                 wilson_lower(int(all_df.loc[mg,target].sum()),n)]
                     scored.append(vals)
 
     summary=pd.DataFrame(rows,columns=[
@@ -343,7 +372,7 @@ def main():
         g=datasets[r.timeframe]
         sub=g.loc[mask(g,r.conditions.split("+"))]
         target=f"hit50_h{r.horizon_bars}"
-        base=float(g[g.timestamp.dt.year>=2026][target].mean())
+        base=float(g.loc[g.timestamp.dt.year>=2026, target].mean())
         pairs=[]
         for pair,x in sub[sub.timestamp.dt.year>=2026].groupby("pair"):
             if len(x)>=5:
