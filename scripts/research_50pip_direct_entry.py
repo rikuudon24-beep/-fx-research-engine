@@ -86,12 +86,15 @@ def load_market(tf,pair):
 def add_labels(df,pair,tf):
     pip=PIP[pair]; n=len(df); close=df.close.to_numpy(); high=df.high.to_numpy(); low=df.low.to_numpy()
     out={f"hit{th}_h{h}":[] for th in LADDER for h in HORIZONS[tf]}
+    out.update({f"hit_short{th}_h{h}":[] for th in LADDER for h in HORIZONS[tf]})
     out.update({f"mfe_h{h}":[] for h in HORIZONS[tf]}); out.update({f"mae_h{h}":[] for h in HORIZONS[tf]})
     for i in range(n):
         for h in HORIZONS[tf]:
             hi=high[i+1:min(n,i+h+1)]; lo=low[i+1:min(n,i+h+1)]
             up=(hi-close[i])/pip; dn=(close[i]-lo)/pip
-            for th in LADDER: out[f"hit{th}_h{h}"].append(bool(len(hi) and np.max(up)>=th))
+            for th in LADDER:
+                out[f"hit{th}_h{h}"].append(bool(len(hi) and np.max(up)>=th))
+                out[f"hit_short{th}_h{h}"].append(bool(len(lo) and np.max(dn)>=th))
             out[f"mfe_h{h}"].append(float(np.max(up)) if len(up) else np.nan)
             out[f"mae_h{h}"].append(float(np.max(dn)) if len(dn) else np.nan)
     return pd.DataFrame(out,index=df.index)
@@ -167,7 +170,7 @@ def main():
         for direction in ("bull","bear"):
             g=tfdf.copy()
             for h in HORIZONS[tf]:
-                target=f"hit50_h{h}"; base=float(g[target].mean())
+                target=f"hit50_h{h}" if direction=="bull" else f"hit_short50_h{h}"; base=float(g[target].mean())
                 for combo in candidate_conditions(direction):
                     sub=g.loc[mask(g,combo)]
                     if len(sub)<75: continue
@@ -204,7 +207,7 @@ def main():
     for r in oos.itertuples(index=False):
         if r.oos_samples<50: continue
         g=all_df[(all_df.timeframe==r.timeframe)&(all_df.timestamp.dt.year>=2026)]
-        sub=g.loc[mask(g,r.conditions.split("+"))]; target=f"hit50_h{r.horizon_bars}"
+        sub=g.loc[mask(g,r.conditions.split("+"))]; target=f"hit50_h{r.horizon_bars}" if r.direction=="bull" else f"hit_short50_h{r.horizon_bars}"
         base=float(g[target].mean()); pairs=[]
         for pair,x in sub.groupby("pair"):
             if len(x)>=5: pairs.append((pair,len(x),float(x[target].mean())))
