@@ -28,7 +28,10 @@ def feature_pool(direction):
     mtf=mod.MTF_BULL if direction=="bull" else mod.MTF_BEAR
     struct=mod.STRUCT_BULL if direction=="bull" else mod.STRUCT_BEAR
     cross=mod.CROSS_BULL if direction=="bull" else mod.CROSS_BEAR
-    return list(dict.fromkeys(local+mtf+struct+cross))
+    toolkit=mod.TOOLKIT_BULL if direction=="bull" else mod.TOOLKIT_BEAR
+    # Local chart-toolkit features plus completed higher-timeframe equivalents.
+    mtf_toolkit=[f"mtf_{x}" for x in toolkit]
+    return list(dict.fromkeys(local+toolkit+mtf+mtf_toolkit+struct+cross))
 
 def main():
     Path("reports").mkdir(exist_ok=True)
