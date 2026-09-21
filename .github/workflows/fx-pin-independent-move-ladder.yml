@@ -1,0 +1,42 @@
+name: FX Pin-Independent Move Ladder Research
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/research_pin_independent_move_ladder.py"
+      - "scripts/research_50pip_mtf_structure.py"
+      - "data/market/**"
+      - ".github/workflows/fx-pin-independent-move-ladder.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pandas numpy
+      - name: Run pin-independent research
+        run: python -u scripts/research_pin_independent_move_ladder.py
+      - name: Upload research reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: pin-independent-move-ladder-research
+          path: |
+            reports/pin_independent_move_ladder_oos.csv
+            reports/pin_independent_move_ladder_robustness.csv
+            reports/pin_independent_move_ladder_shortlist.csv
+      - name: Commit research reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/pin_independent_move_ladder_oos.csv reports/pin_independent_move_ladder_robustness.csv reports/pin_independent_move_ladder_shortlist.csv
+          git diff --cached --quiet || git commit -m "research: save pin-independent move ladder results"
+          git push
