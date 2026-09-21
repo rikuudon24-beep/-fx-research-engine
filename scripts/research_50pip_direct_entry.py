@@ -154,6 +154,7 @@ def build_features(df):
         "ichimoku_bull":c>cloud_top, "ichimoku_bear":c<cloud_bottom,
         "ichimoku_tk_bull":tenkan>kijun, "ichimoku_tk_bear":tenkan<kijun,
         "ichimoku_cloud_bull":span_a>span_b, "ichimoku_cloud_bear":span_a<span_b,
+        "span_model_bull":(tenkan>kijun)&(c>cloud_top), "span_model_bear":(tenkan<kijun)&(c<cloud_bottom),
         "stoch_bull":stoch_k>stoch_d, "stoch_bear":stoch_k<stoch_d,
         "stoch_cross_up":(stoch_k.shift(1)<=stoch_d.shift(1))&(stoch_k>stoch_d),
         "stoch_cross_down":(stoch_k.shift(1)>=stoch_d.shift(1))&(stoch_k<stoch_d),
@@ -264,7 +265,7 @@ BEAR_BASE=[
 TOOLKIT_BULL=[
     # Every item shown in the user's chart-tool list is represented.
     "sma20_bull","sma50_bull","sma200_bull","sma_stack_bull",
-    "ichimoku_bull","ichimoku_tk_bull","ichimoku_cloud_bull",
+    "ichimoku_bull","ichimoku_tk_bull","ichimoku_cloud_bull","span_model_bull",
     "bb_bull","bb_upper","superbb_bull","superbb_squeeze","superbb_expand",
     "stoch_bull","stoch_cross_up","stoch_recover_up",
     "rci_bull","rci_strong_bull","rci_cross_up",
@@ -279,7 +280,7 @@ TOOLKIT_BULL=[
 ]
 TOOLKIT_BEAR=[
     "sma20_bear","sma50_bear","sma200_bear","sma_stack_bear",
-    "ichimoku_bear","ichimoku_tk_bear","ichimoku_cloud_bear",
+    "ichimoku_bear","ichimoku_tk_bear","ichimoku_cloud_bear","span_model_bear",
     "bb_bear","bb_lower","superbb_bear","superbb_squeeze","superbb_expand",
     "stoch_bear","stoch_cross_down","stoch_fall_down",
     "rci_bear","rci_strong_bear","rci_cross_down",
