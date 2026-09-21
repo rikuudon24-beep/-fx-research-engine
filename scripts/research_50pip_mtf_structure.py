@@ -204,6 +204,7 @@ def build_dataset(tf):
     return pd.concat(rows, ignore_index=True)
 
 # Keep feature namespaces unique: local direct-entry and structure features
+# Directional +50/-50 labels are intentionally separated before research scoring.
 # must never create duplicate DataFrame column names, because g[n] would
 # otherwise return a DataFrame and Series boolean-mask operations can fail.
 def mask(g, names):
