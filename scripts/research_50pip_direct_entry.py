@@ -460,7 +460,7 @@ def main():
         disc=tfdf[tfdf.timestamp.dt.year<=2024]; val=tfdf[tfdf.timestamp.dt.year==2025]; oos=tfdf[tfdf.timestamp.dt.year>=2026]
         for direction in ("bull","bear"):
             for h in HORIZONS[tf]:
-                target=f"hit50_h{h}"; base=float(disc[target].mean()); candidates=[]
+                target=f"hit50_h{h}" if direction=="bull" else f"hit_short50_h{h}"; base=float(disc[target].mean()); candidates=[]
                 for combo in candidate_conditions(direction):
                     sub=disc.loc[mask(disc,combo)]
                     if len(sub)<150: continue
