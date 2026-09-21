@@ -32,7 +32,7 @@ jobs:
             reports/50pip_pin_bear_precursor_summary.csv
       - name: Persist reports
         if: success()
-        env: {GH_TOKEN: ${{ github.token }}}
+        env:\n          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
