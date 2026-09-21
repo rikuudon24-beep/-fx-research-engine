@@ -133,7 +133,7 @@ def main():
         data=mtf.build_dataset(tf)
         states=[]
         for pair,g in data.groupby("pair",sort=False):
-            s=build_states(g,horizon,pair)
+            s=build_states(g,pair,horizon)
             if len(s): states.append(s)
         states=pd.concat(states,ignore_index=True)
         for transition in TARGET_PAIRS:
