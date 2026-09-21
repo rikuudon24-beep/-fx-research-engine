@@ -22,6 +22,7 @@ mtf=importlib.util.module_from_spec(spec); spec.loader.exec_module(mtf)
 
 TFS=mtf.TFS
 HORIZONS={"h4":12,"d1":10}
+REMAINING_WINDOWS={"h4":6,"d1":5}
 LADDER=[50,100,150,200,300]
 
 FAMILIES={
@@ -98,6 +99,26 @@ def enrich_chain(g, horizon, pair):
             ha=hits[a]
             hb=hits[b]
             rec[f"cont_{a}_{b}"]=bool(ha is not None and hb is not None and hb>ha)
+            # After +a is reached, inspect only the next remaining window.
+            if ha is not None:
+                tf_key="h4" if horizon==12 else "d1"
+                end=min(len(g),ha+1+REMAINING_WINDOWS[tf_key])
+                rem_hit=None
+                for j in range(ha+1,end):
+                    if float(g.high.iloc[j]) >= e+b*pip:
+                        rem_hit=j
+                        break
+                rec[f"rem_cont_{a}_{b}"]=bool(rem_hit is not None)
+                rec[f"rem_bars_{a}_{b}"]=(rem_hit-ha) if rem_hit is not None else np.nan
+                lows=g.low.iloc[ha+1:end].astype(float)
+                highs2=g.high.iloc[ha+1:end].astype(float)
+                rec[f"post_{a}_mfe_pips"]=float((highs2.max()-e)/pip) if len(highs2) else np.nan
+                rec[f"post_{a}_mae_pips"]=float((lows.min()-e)/pip) if len(lows) else np.nan
+            else:
+                rec[f"rem_cont_{a}_{b}"]=False
+                rec[f"rem_bars_{a}_{b}"]=np.nan
+                rec[f"post_{a}_mfe_pips"]=np.nan
+                rec[f"post_{a}_mae_pips"]=np.nan
         out.append(rec)
     return pd.DataFrame(out)
 
@@ -178,9 +199,13 @@ def main():
                     q=pm & ev[f"hit{a}"].notna()
                     n=int(q.sum())
                     rate=float(ev.loc[q,f"cont_{a}_{b}"].mean()) if n else np.nan
-                    base=float(period[f"hit{b}"].mean()) if len(period) else np.nan
+                    allq=period[f"hit{a}"].notna()
+                    base=float(period.loc[allq,f"cont_{a}_{b}"].mean()) if int(allq.sum()) else np.nan
+                    rem_rate=float(ev.loc[q,f"rem_cont_{a}_{b}"].mean()) if n else np.nan
+                    mfe=float(ev.loc[q,f"post_{a}_mfe_pips"].mean()) if n else np.nan
+                    mae=float(ev.loc[q,f"post_{a}_mae_pips"].mean()) if n else np.nan
                     score_rows.append([tf,name,a,b,"+".join(c),n,rate,base,rate/base if n and base else np.nan,
-                                       wilson(int(ev.loc[q,f"cont_{a}_{b}"].sum()),n)])
+                                       wilson(int(ev.loc[q,f"cont_{a}_{b}"].sum()),n),rem_rate,mfe,mae])
             # Pair robustness on OOS for each transition.
             for a,b in zip(LADDER[:-1],LADDER[1:]):
                 q=m & (ev.timestamp.dt.year>=2026) & ev[f"hit{a}"].notna()
@@ -191,7 +216,8 @@ def main():
                     chain_rows.append([tf,a,b,"+".join(c),dn,int(q.sum()),float(ev.loc[q,f"cont_{a}_{b}"].mean()),
                                        len(pairs),float(np.mean(pairs)),float(min(pairs))])
     cols=["timeframe","period","from_target","to_target","conditions","samples_after_from",
-          "continuation_rate","unconditional_to_rate","continuation_lift","wilson95_lower"]
+          "continuation_rate","unconditional_continuation_rate","continuation_lift","wilson95_lower",
+          "remaining_window_continuation_rate","post_from_mfe_pips_mean","post_from_mae_pips_mean"]
     pd.DataFrame(score_rows,columns=cols).to_csv("reports/move_chain_continuation.csv",index=False,float_format="%.8f")
     pd.DataFrame(chain_rows,columns=["timeframe","from_target","to_target","conditions","discovery_n","oos_n",
                                      "oos_continuation_rate","oos_pairs_n_ge5","oos_pair_continuation_mean","oos_pair_continuation_min"]
