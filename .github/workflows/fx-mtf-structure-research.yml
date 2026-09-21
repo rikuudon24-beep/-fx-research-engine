@@ -41,4 +41,10 @@ jobs:
           printf 'run_commit=%s\nrun_utc=%s\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > reports/mtf_latest_run_manifest.txt
           git add reports/50pip_mtf_structure_conditions.csv reports/50pip_mtf_structure_oos.csv reports/50pip_mtf_structure_robustness.csv reports/mtf_latest_run_manifest.txt
           git diff --cached --quiet || git commit -m "research: save MTF research result manifest"
-          git push
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main && git push && exit 0
+            git rebase --abort || true
+            sleep $((attempt * 5))
+          done
+          exit 1
