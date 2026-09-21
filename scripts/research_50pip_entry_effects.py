@@ -59,8 +59,6 @@ def main():
     # The ratio columns above are intentionally feature-state ratios; keep a
     # separate OOS lift against the full OOS base for easy screening.
     out["oos_base_lift"]=np.nan
-    for (tf,h),g in all_df.groupby(["timeframe"],sort=False):
-        pass
     for i,r in out.iterrows():
         g=all_df[(all_df.timeframe==r.timeframe)&(all_df.timestamp.dt.year>=2026)]
         base=float(g[f"hit50_h{r.horizon_bars}"].mean())
@@ -92,7 +90,7 @@ def main():
                         vals=[tf,direction,h,a,b]
                         for g in (disc,tfdf[tfdf.timestamp.dt.year==2025],tfdf[tfdf.timestamp.dt.year>=2026]):
                             sa=g[g[a].fillna(False)]
-                            sb=sa[sbmask] if False else sa[g.loc[sa.index,b].fillna(False)]
+                            sb=sa[g.loc[sa.index,b].fillna(False)]
                             if len(sb)<50:
                                 vals += [len(sb),np.nan,np.nan]
                             else:
