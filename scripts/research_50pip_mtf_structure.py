@@ -342,7 +342,7 @@ def main():
             oos = all_df[all_df.timestamp.dt.year >= 2026]
 
             for h in target_horizons:
-                target = f"hit50_h{h}"
+                target = f"hit50_h{h}" if direction == "bull" else f"hit_short50_h{h}"
                 base_all = float(all_df[target].mean())
                 for combo, m in mask_cache.items():
                     n = int(m.sum())
@@ -402,7 +402,7 @@ def main():
         if r.oos_samples < 50: continue
         g=datasets[r.timeframe]
         sub=g.loc[mask(g,r.conditions.split("+"))]
-        target=f"hit50_h{r.horizon_bars}"
+        target=f"hit50_h{r.horizon_bars}" if r.direction=="bull" else f"hit_short50_h{r.horizon_bars}"
         base=float(g.loc[g.timestamp.dt.year>=2026, target].mean())
         pairs=[]
         for pair,x in sub[sub.timestamp.dt.year>=2026].groupby("pair"):
