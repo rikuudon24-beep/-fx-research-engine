@@ -38,7 +38,7 @@ def main():
         for direction in ("bull","bear"):
             features=BULL_BASE if direction=="bull" else BEAR_BASE
             for h in HORIZONS[tf]:
-                target=f"hit50_h{h}"
+                target=f"hit50_h{h}" if direction=="bull" else f"hit_short50_h{h}"
                 for feature in features:
                     vals=[tf,direction,h,feature]
                     for g in (tfdf[tfdf.timestamp.dt.year<=2024],
@@ -61,7 +61,7 @@ def main():
     out["oos_base_lift"]=np.nan
     for i,r in out.iterrows():
         g=all_df[(all_df.timeframe==r.timeframe)&(all_df.timestamp.dt.year>=2026)]
-        base=float(g[f"hit50_h{r.horizon_bars}"].mean())
+        base=float(g[f"hit50_h{r.horizon_bars}" if r.direction=="bull" else f"hit_short50_h{r.horizon_bars}"].mean())
         if np.isfinite(r.oos_true_hit): out.at[i,"oos_base_lift"]=r.oos_true_hit/base if base else np.nan
     out=out.sort_values(["oos_base_lift","oos_diff","oos_true_n"],ascending=False)
     Path("reports").mkdir(exist_ok=True)
