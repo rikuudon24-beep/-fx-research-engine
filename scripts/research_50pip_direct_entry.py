@@ -195,22 +195,36 @@ BULL_BASE=[
     "rsi60","macd_bull","macd_rising","adx25","adx_rising","di_bull","di_strong_bull","volatility",
     "bb_bull","bb_upper","body_bull","rsi_up1","rsi_up3","rsi_cross50_up","rsi_cross55_up",
     "macd_cross_up","macd_accel_up","adx_up3","adx_cross25_up","di_cross_up","di_spread_up3",
-    "ema20_slope_up3","price20_cross_up","price200_cross_up","breakout20_up","atr_expand","bb_expand","body_expand",
-    "sma20_bull","sma50_bull","sma200_bull","sma_stack_bull","ichimoku_bull","ichimoku_tk_bull","ichimoku_cloud_bull",
-    "stoch_bull","stoch_cross_up","stoch_recover_up","rci_bull","rci_strong_bull","rci_cross_up",
-    "fib_above382","fib_above500","fib_above618","fib_retrace38_bull","fib_retrace62_bull",
-    "trendline_up","channel_upper","channel_mid_bull","channel_breakout_up","compression","shape_triangle_proxy"
+    "ema20_slope_up3","price20_cross_up","price200_cross_up","breakout20_up","atr_expand","bb_expand","body_expand"
 ]
+
 BEAR_BASE=[
     "trend_bear","price20_bear","price200_bear","ema20_falling","ema200_falling","momentum_bear",
     "rsi40","macd_bear","macd_falling","adx25","adx_rising","di_bear","di_strong_bear","volatility",
     "bb_bear","bb_lower","body_bear","rsi_down1","rsi_down3","rsi_cross50_down","rsi_cross45_down",
     "macd_cross_down","macd_accel_down","adx_up3","adx_cross25_up","di_cross_down","di_spread_down3",
-    "ema20_slope_down3","price20_cross_down","price200_cross_down","breakout20_down","atr_expand","bb_expand","body_expand",
-    "sma20_bear","sma50_bear","sma200_bear","sma_stack_bear","ichimoku_bear","ichimoku_tk_bear","ichimoku_cloud_bear",
-    "stoch_bear","stoch_cross_down","stoch_fall_down","rci_bear","rci_strong_bear","rci_cross_down",
+    "ema20_slope_down3","price20_cross_down","price200_cross_down","breakout20_down","atr_expand","bb_expand","body_expand"
+]
+
+
+
+TOOLKIT_BULL=[
+    "sma20_bull","sma50_bull","sma200_bull","sma_stack_bull",
+    "ichimoku_bull","ichimoku_tk_bull","ichimoku_cloud_bull",
+    "stoch_bull","stoch_cross_up","stoch_recover_up",
+    "rci_bull","rci_strong_bull","rci_cross_up",
+    "fib_above382","fib_above500","fib_above618","fib_retrace38_bull","fib_retrace62_bull",
+    "trendline_up","channel_upper","channel_mid_bull","channel_breakout_up",
+    "compression","shape_triangle_proxy"
+]
+TOOLKIT_BEAR=[
+    "sma20_bear","sma50_bear","sma200_bear","sma_stack_bear",
+    "ichimoku_bear","ichimoku_tk_bear","ichimoku_cloud_bear",
+    "stoch_bear","stoch_cross_down","stoch_fall_down",
+    "rci_bear","rci_strong_bear","rci_cross_down",
     "fib_below382","fib_below500","fib_below618","fib_retrace38_bear","fib_retrace62_bear",
-    "trendline_down","channel_lower","channel_mid_bear","channel_breakout_down","compression","shape_triangle_proxy"
+    "trendline_down","channel_lower","channel_mid_bear","channel_breakout_down",
+    "compression","shape_triangle_proxy"
 ]
 
 CORE_BULL=[
