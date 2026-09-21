@@ -117,6 +117,51 @@ def build_features(df):
     channel_rng=(channel_hi-channel_lo).replace(0,np.nan)
     channel_pos=(c-channel_lo)/channel_rng
 
+    # Additional market-structure / breakout-context families.
+    # These are deliberately generic so the research can discover which
+    # consolidation pattern matters instead of hard-coding one textbook setup.
+    range_hi20=h.shift(1).rolling(20).max()
+    range_lo20=l.shift(1).rolling(20).min()
+    range_mid20=(range_hi20+range_lo20)/2
+    range_width=(range_hi20-range_lo20).replace(0,np.nan)
+    range_width5=(h.shift(1).rolling(5).max()-l.shift(1).rolling(5).min()).replace(0,np.nan)
+    range_width20=range_width
+    range_compression=range_width5/range_width20
+    inside_bar=(h<h.shift(1))&(l>l.shift(1))
+    inside2=inside_bar&inside_bar.shift(1)
+    nr7=(h-l)==(h-l).rolling(7).min()
+    nr4=(h-l)==(h-l).rolling(4).min()
+    breakout_up20=c>range_hi20
+    breakout_down20=c<range_lo20
+    retest_up=(l<=range_hi20)&(c>range_hi20)
+    retest_down=(h>=range_lo20)&(c<range_lo20)
+    false_break_up=(h>range_hi20)&(c<range_hi20)
+    false_break_down=(l<range_lo20)&(c>range_lo20)
+    range_tight=(range_width20/atr)<3
+    range_expansion=(range_width5/range_width20)>1.15
+    squeeze_release_up=bb_squeeze & breakout_up20
+    squeeze_release_down=bb_squeeze & breakout_down20
+
+    # Candle anatomy / price-action families.
+    upper_wick=(h-np.maximum(c,o)).clip(lower=0)
+    lower_wick=(np.minimum(c,o)-l).clip(lower=0)
+    pin_bull=(lower_wick>=body*2)&((h-c)/(h-l).replace(0,np.nan)<.35)
+    pin_bear=(upper_wick>=body*2)&((c-l)/(h-l).replace(0,np.nan)<.35)
+    engulf_bull=(c>o)&(c.shift(1)<o.shift(1))&(c>=o.shift(1))&(o<=c.shift(1))
+    engulf_bear=(c<o)&(c.shift(1)>o.shift(1))&(c<=o.shift(1))&(o>=c.shift(1))
+    strong_close_bull=(h-c)/(h-l).replace(0,np.nan)<.15
+    strong_close_bear=(c-l)/(h-l).replace(0,np.nan)<.15
+    gap_proxy_up=o>h.shift(1)
+    gap_proxy_down=o<l.shift(1)
+
+    # Swing sequence / market-structure transitions.
+    hh20=h>h.shift(1).rolling(20).max()
+    ll20=l<l.shift(1).rolling(20).min()
+    higher_low=l>l.shift(1)
+    lower_high=h<h.shift(1)
+    structure_bull_transition=higher_low & (c>c.shift(1))
+    structure_bear_transition=lower_high & (c<c.shift(1))
+
     # Elliott-wave-inspired causal structure proxies.
     # Exact Elliott labeling is discretionary; here we encode reproducible
     # swing/impulse/retracement relationships using only completed bars.
@@ -219,6 +264,20 @@ def build_features(df):
         "triangle_breakout_up":(compression<.75)&(c>channel_hi),
         "triangle_breakout_down":(compression<.75)&(c<channel_lo),
         "ellipse_compression":compression<.65,
+        "range_compression":range_compression<.70, "range_tight":range_tight,
+        "range_expansion":range_expansion, "inside_bar":inside_bar, "inside_2":inside2,
+        "nr7":nr7, "nr4":nr4,
+        "breakout_up20":breakout_up20, "breakout_down20":breakout_down20,
+        "retest_up":retest_up, "retest_down":retest_down,
+        "false_break_up":false_break_up, "false_break_down":false_break_down,
+        "squeeze_release_up":squeeze_release_up, "squeeze_release_down":squeeze_release_down,
+        "pin_bull":pin_bull, "pin_bear":pin_bear,
+        "engulf_bull":engulf_bull, "engulf_bear":engulf_bear,
+        "strong_close_bull":strong_close_bull, "strong_close_bear":strong_close_bear,
+        "gap_proxy_up":gap_proxy_up, "gap_proxy_down":gap_proxy_down,
+        "hh20":hh20, "ll20":ll20,
+        "structure_bull_transition":structure_bull_transition,
+        "structure_bear_transition":structure_bear_transition,
         "elliott_wave2_bull":elliott_wave2_bull, "elliott_wave3_bull":elliott_wave3_bull,
         "elliott_wave4_bull":elliott_wave4_bull, "elliott_wave5_bull":elliott_wave5_bull,
         "elliott_impulse_bull":elliott_impulse_bull, "elliott_pullback_bull":elliott_pullback_bull,
@@ -310,6 +369,9 @@ TOOLKIT_BULL=[
     "vertical_session","vertical_day_open","vertical_week_open",
     "rectangle_range","triangle_breakout_up","ellipse_compression",
     "elliott_wave2_bull","elliott_wave3_bull","elliott_wave4_bull","elliott_wave5_bull","elliott_impulse_bull","elliott_pullback_bull",
+    "range_compression","range_tight","range_expansion","inside_bar","inside_2","nr7","nr4",
+    "breakout_up20","retest_up","squeeze_release_up","pin_bull","engulf_bull","strong_close_bull",
+    "gap_proxy_up","hh20","structure_bull_transition",
     "compression","shape_triangle_proxy"
 ]
 TOOLKIT_BEAR=[
@@ -326,6 +388,9 @@ TOOLKIT_BEAR=[
     "vertical_session","vertical_day_open","vertical_week_open",
     "rectangle_range","triangle_breakout_down","ellipse_compression",
     "elliott_wave2_bear","elliott_wave3_bear","elliott_wave4_bear","elliott_wave5_bear","elliott_impulse_bear","elliott_pullback_bear",
+    "range_compression","range_tight","range_expansion","inside_bar","inside_2","nr7","nr4",
+    "breakout_down20","retest_down","squeeze_release_down","pin_bear","engulf_bear","strong_close_bear",
+    "gap_proxy_down","ll20","structure_bear_transition",
     "compression","shape_triangle_proxy"
 ]
 
