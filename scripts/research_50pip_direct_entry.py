@@ -18,6 +18,21 @@ LADDER=[50,100,150,200,300]
 
 def rma(s,n): return s.ewm(alpha=1/n,adjust=False,min_periods=n).mean()
 
+def rolling_slope(s, n):
+    x=np.arange(n,dtype=float)
+    xm=x.mean()
+    den=((x-xm)**2).sum()
+    return s.rolling(n).apply(lambda y: float(np.dot(x-xm, y-y.mean())/den) if np.isfinite(y).all() else np.nan, raw=True)
+
+def rci(s,n=14):
+    ranks_t=np.arange(1,n+1,dtype=float)
+    def calc(y):
+        if not np.isfinite(y).all(): return np.nan
+        ranks=pd.Series(y).rank(method="average").to_numpy()
+        d=ranks-ranks_t
+        return 100.0*(1.0-6.0*np.sum(d*d)/(n*(n*n-1)))
+    return s.rolling(n).apply(calc,raw=True)
+
 def build_features(df):
     c,h,l,o=df.close,df.high,df.low,df.open
     e20=c.ewm(span=20,adjust=False).mean(); e50=c.ewm(span=50,adjust=False).mean(); e200=c.ewm(span=200,adjust=False).mean()
@@ -34,6 +49,44 @@ def build_features(df):
     mid=c.rolling(20).mean(); sd=c.rolling(20).std(); bbpos=(c-(mid-2*sd))/(4*sd).replace(0,np.nan)
     bbwidth=(4*sd/mid.replace(0,np.nan))
     body=(c-o).abs()/(h-l).replace(0,np.nan)
+
+    # Additional chart/indicator families from the user's charting toolkit.
+    # All are causal: rolling swing levels use shift(1), and Ichimoku cloud
+    # values at time t are the forward-shifted values that were already known.
+    sma20=c.rolling(20).mean(); sma50=c.rolling(50).mean(); sma200=c.rolling(200).mean()
+    bb_std=sd
+    bb_upper_band=mid+2*bb_std; bb_lower_band=mid-2*bb_std
+
+    tenkan=(h.rolling(9).max()+l.rolling(9).min())/2
+    kijun=(h.rolling(26).max()+l.rolling(26).min())/2
+    span_a=((tenkan+kijun)/2).shift(26)
+    span_b=((h.rolling(52).max()+l.rolling(52).min())/2).shift(26)
+    cloud_top=pd.concat([span_a,span_b],axis=1).max(axis=1)
+    cloud_bottom=pd.concat([span_a,span_b],axis=1).min(axis=1)
+
+    stoch_low=l.rolling(14).min(); stoch_high=h.rolling(14).max()
+    stoch_k=100*(c-stoch_low)/(stoch_high-stoch_low).replace(0,np.nan)
+    stoch_d=stoch_k.rolling(3).mean()
+
+    rci14=rci(c,14)
+
+    # Fibonacci retracement of the preceding 50 completed candles.
+    fib_hi=h.shift(1).rolling(50).max(); fib_lo=l.shift(1).rolling(50).min()
+    fib_rng=(fib_hi-fib_lo).replace(0,np.nan)
+    fib236=fib_hi-fib_rng*.236; fib382=fib_hi-fib_rng*.382
+    fib500=fib_hi-fib_rng*.500; fib618=fib_hi-fib_rng*.618; fib786=fib_hi-fib_rng*.786
+    fib_pos=(c-fib_lo)/fib_rng
+
+    # Objective trendline/channel proxies: regression slope and normalized
+    # channel position over the preceding 20 completed candles.
+    slope20=rolling_slope(c,20)
+    channel_hi=h.shift(1).rolling(20).max(); channel_lo=l.shift(1).rolling(20).min()
+    channel_rng=(channel_hi-channel_lo).replace(0,np.nan)
+    channel_pos=(c-channel_lo)/channel_rng
+
+    # Shape proxies from OHLC rather than subjective visual pattern labels.
+    compression=(h-l).rolling(5).mean()/(h-l).rolling(20).mean().replace(0,np.nan)
+    triangle_proxy=(h.shift(1).rolling(10).max()-h.shift(1).rolling(10).min())/(l.shift(1).rolling(10).max()-l.shift(1).rolling(10).min()).replace(0,np.nan)
 
     # State features: explicitly directional. Never derive bear signals by negating bull signals.
     f=pd.DataFrame({
@@ -53,6 +106,39 @@ def build_features(df):
         "bb_bull":bbpos>.5, "bb_bear":bbpos<.5,
         "bb_upper":bbpos>=.8, "bb_lower":bbpos<=.2,
         "body_bull":(c>o)&(body>.6), "body_bear":(c<o)&(body>.6),
+
+        # SMA / Ichimoku / Stochastic / RCI / Fibonacci / line-channel proxies.
+        "sma20_bull":c>sma20, "sma20_bear":c<sma20,
+        "sma50_bull":c>sma50, "sma50_bear":c<sma50,
+        "sma200_bull":c>sma200, "sma200_bear":c<sma200,
+        "sma_stack_bull":(sma20>sma50)&(sma50>sma200),
+        "sma_stack_bear":(sma20<sma50)&(sma50<sma200),
+        "ichimoku_bull":c>cloud_top, "ichimoku_bear":c<cloud_bottom,
+        "ichimoku_tk_bull":tenkan>kijun, "ichimoku_tk_bear":tenkan<kijun,
+        "ichimoku_cloud_bull":span_a>span_b, "ichimoku_cloud_bear":span_a<span_b,
+        "stoch_bull":stoch_k>stoch_d, "stoch_bear":stoch_k<stoch_d,
+        "stoch_cross_up":(stoch_k.shift(1)<=stoch_d.shift(1))&(stoch_k>stoch_d),
+        "stoch_cross_down":(stoch_k.shift(1)>=stoch_d.shift(1))&(stoch_k<stoch_d),
+        "stoch_recover_up":(stoch_k.shift(1)<20)&(stoch_k>=20),
+        "stoch_fall_down":(stoch_k.shift(1)>80)&(stoch_k<=80),
+        "rci_bull":rci14>0, "rci_bear":rci14<0,
+        "rci_strong_bull":rci14>=80, "rci_strong_bear":rci14<=-80,
+        "rci_cross_up":(rci14.shift(1)<=0)&(rci14>0),
+        "rci_cross_down":(rci14.shift(1)>=0)&(rci14<0),
+        "fib_above382":c>fib382, "fib_above500":c>fib500,
+        "fib_above618":c>fib618, "fib_below382":c<fib382,
+        "fib_below500":c<fib500, "fib_below618":c<fib618,
+        "fib_retrace38_bull":(c>=fib382)&(c<=fib500),
+        "fib_retrace62_bull":(c>=fib618)&(c<=fib786),
+        "fib_retrace38_bear":(c<=fib618)&(c>=fib500),
+        "fib_retrace62_bear":(c<=fib382)&(c>=fib236),
+        "trendline_up":slope20>0, "trendline_down":slope20<0,
+        "channel_upper":channel_pos>=.80, "channel_lower":channel_pos<=.20,
+        "channel_mid_bull":channel_pos>.50, "channel_mid_bear":channel_pos<.50,
+        "channel_breakout_up":c>channel_hi, "channel_breakout_down":c<channel_lo,
+        "compression":compression<.75,
+        "shape_triangle_proxy":(compression<.75)&(channel_rng/channel_lo.replace(0,np.nan)<.03),
+
         # Change / transition features: what changed immediately before entry.
         "rsi_up1":rsi.diff(1)>3, "rsi_down1":rsi.diff(1)<-3,
         "rsi_up3":rsi.diff(3)>5, "rsi_down3":rsi.diff(3)<-5,
@@ -109,14 +195,22 @@ BULL_BASE=[
     "rsi60","macd_bull","macd_rising","adx25","adx_rising","di_bull","di_strong_bull","volatility",
     "bb_bull","bb_upper","body_bull","rsi_up1","rsi_up3","rsi_cross50_up","rsi_cross55_up",
     "macd_cross_up","macd_accel_up","adx_up3","adx_cross25_up","di_cross_up","di_spread_up3",
-    "ema20_slope_up3","price20_cross_up","price200_cross_up","breakout20_up","atr_expand","bb_expand","body_expand"
+    "ema20_slope_up3","price20_cross_up","price200_cross_up","breakout20_up","atr_expand","bb_expand","body_expand",
+    "sma20_bull","sma50_bull","sma200_bull","sma_stack_bull","ichimoku_bull","ichimoku_tk_bull","ichimoku_cloud_bull",
+    "stoch_bull","stoch_cross_up","stoch_recover_up","rci_bull","rci_strong_bull","rci_cross_up",
+    "fib_above382","fib_above500","fib_above618","fib_retrace38_bull","fib_retrace62_bull",
+    "trendline_up","channel_upper","channel_mid_bull","channel_breakout_up","compression","shape_triangle_proxy"
 ]
 BEAR_BASE=[
     "trend_bear","price20_bear","price200_bear","ema20_falling","ema200_falling","momentum_bear",
     "rsi40","macd_bear","macd_falling","adx25","adx_rising","di_bear","di_strong_bear","volatility",
     "bb_bear","bb_lower","body_bear","rsi_down1","rsi_down3","rsi_cross50_down","rsi_cross45_down",
     "macd_cross_down","macd_accel_down","adx_up3","adx_cross25_up","di_cross_down","di_spread_down3",
-    "ema20_slope_down3","price20_cross_down","price200_cross_down","breakout20_down","atr_expand","bb_expand","body_expand"
+    "ema20_slope_down3","price20_cross_down","price200_cross_down","breakout20_down","atr_expand","bb_expand","body_expand",
+    "sma20_bear","sma50_bear","sma200_bear","sma_stack_bear","ichimoku_bear","ichimoku_tk_bear","ichimoku_cloud_bear",
+    "stoch_bear","stoch_cross_down","stoch_fall_down","rci_bear","rci_strong_bear","rci_cross_down",
+    "fib_below382","fib_below500","fib_below618","fib_retrace38_bear","fib_retrace62_bear",
+    "trendline_down","channel_lower","channel_mid_bear","channel_breakout_down","compression","shape_triangle_proxy"
 ]
 
 CORE_BULL=[
