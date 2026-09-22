@@ -1,0 +1,19 @@
+name: FX Notification Trade Outcome Replay
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with: {python-version: '3.11'}
+    - run: pip install pandas numpy requests
+    - run: python scripts/research_notification_replay.py
+    - run: python scripts/research_notification_trade_outcomes.py
+    - uses: actions/upload-artifact@v4
+      with:
+        name: notification-trade-outcomes
+        path: reports/notification_trade_outcomes*.csv
