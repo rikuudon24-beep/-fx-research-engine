@@ -1,0 +1,19 @@
+name: FX State Machine Entry Filter Research
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pandas numpy requests
+      - run: python scripts/research_state_machine_entry_filters.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: state-machine-entry-filter-research
+          path: reports/state_machine_entry_filter_*.csv
