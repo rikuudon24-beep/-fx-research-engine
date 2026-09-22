@@ -1,0 +1,41 @@
+name: FX Exit PnL Comparison Research
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/research_exit_pnl_comparison.py"
+      - "scripts/research_50pip_mtf_structure.py"
+      - "data/market/**"
+      - ".github/workflows/fx-exit-pnl-comparison.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pandas numpy
+      - name: Run exit PnL comparison
+        run: python -u scripts/research_exit_pnl_comparison.py
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: exit-pnl-comparison-research
+          path: |
+            reports/exit_pnl_comparison.csv
+            reports/exit_pnl_events.csv
+      - name: Commit reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/exit_pnl_comparison.csv reports/exit_pnl_events.csv
+          git diff --cached --quiet || git commit -m "research: save exit pnl comparison results"
+          git push
