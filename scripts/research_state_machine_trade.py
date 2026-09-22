@@ -122,7 +122,7 @@ def build(tf="h4"):
 
 def exit_cond_series(f):
     # independent-exit condition, computed causally from the same completed candle.
-    c=f.close.astype(float); e20=c.ewm(span=20,adjust=False).mean()
+    c=f["close"].astype(float); e20=c.ewm(span=20,adjust=False).mean()
     d=c.diff(); up=f.high.diff(); dn=-f.low.diff()
     atr=pd.concat([f.high-f.low,(f.high-c.shift()).abs(),(f.low-c.shift()).abs()],axis=1).max(axis=1).ewm(alpha=1/14,adjust=False,min_periods=14).mean()
     plus=pd.Series(np.where((up>dn)&(up>0),up,0),index=f.index).ewm(alpha=1/14,adjust=False,min_periods=14).mean()
