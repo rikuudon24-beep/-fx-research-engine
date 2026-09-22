@@ -1,0 +1,18 @@
+name: FX Final Candidate Trade Ladder
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with: {python-version: '3.11'}
+    - run: pip install pandas numpy requests
+    - run: python scripts/research_final_candidate_trade.py
+    - uses: actions/upload-artifact@v4
+      with:
+        name: final-candidate-trade-ladder
+        path: reports/final_candidate_*.csv
