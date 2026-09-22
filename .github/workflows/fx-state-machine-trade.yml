@@ -1,6 +1,8 @@
 name: FX State Machine Trade Backtest
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 jobs:
   research:
     runs-on: ubuntu-latest
