@@ -106,7 +106,7 @@ def main():
     # Selection uses discovery + validation only; OOS remains held out.
     sel=[]
     for direction in ["long","short"]:
-        for name in sorted(res[res.direction==direction].filter.unique()):
+        for name in sorted(res[res.direction==direction]["filter"].unique()):
             a=res[(res.direction==direction)&(res.filter==name)&(res.period=="discovery")].iloc[0]
             b=res[(res.direction==direction)&(res.filter==name)&(res.period=="validation")].iloc[0]
             if a.trades>=25 and b.trades>=10 and a.mean_delta_vs_baseline>0 and b.mean_delta_vs_baseline>0:
