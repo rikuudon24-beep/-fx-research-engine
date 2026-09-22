@@ -44,7 +44,8 @@ def build(tf="h4"):
         g["ema20"]=e20; g["ema200"]=e200
         g["cross_up"]=(e20.shift(1)<=e200.shift(1))&(e20>e200)
         g["cross_down"]=(e20.shift(1)>=e200.shift(1))&(e20<e200)
-        g["exit_cond"]=exit_cond_series(f)
+        g["exit_cond_long"]=f["price20_cross_down"] & f["di_spread_down3"]
+        g["exit_cond_short"]=f["price20_cross_up"] & f["di_spread_up3"]
         pip=PIP[pair]
         i=1
         while i<len(g)-25:
@@ -102,13 +103,13 @@ def build(tf="h4"):
                 if direction==1:
                     if lo<=stop_px: ladder_idx=k; ladder_px=stop_px; break
                     if hi>=entry_px+50*pip: reached50=True
-                    if reached50 and bool(g.exit_cond.iloc[k]):
+                    if reached50 and bool(g.exit_cond_long.iloc[k]):
                         ladder_idx=k; ladder_px=float(g.close.iloc[k]); break
                     if hi>=entry_px+100*pip: ladder_idx=k; ladder_px=entry_px+100*pip; break
                 else:
                     if hi>=stop_px: ladder_idx=k; ladder_px=stop_px; break
                     if lo<=entry_px-50*pip: reached50=True
-                    if reached50 and bool(g.exit_cond.iloc[k]):
+                    if reached50 and bool(g.exit_cond_short.iloc[k]):
                         ladder_idx=k; ladder_px=float(g.close.iloc[k]); break
                     if lo<=entry_px-100*pip: ladder_idx=k; ladder_px=entry_px-100*pip; break
             if ladder_idx is None: ladder_idx=x.index[-1]; ladder_px=float(g.close.iloc[ladder_idx])
@@ -119,17 +120,6 @@ def build(tf="h4"):
             i=entry+1
     return pd.DataFrame(rows,columns=["timeframe","pair","direction","cross_timestamp","touch_timestamp","entry_timestamp",
         "entry_price","stop_price","target100_pips","managed_exit_pips","bars_base","bars_managed"])
-
-def exit_cond_series(f):
-    # independent-exit condition, computed causally from the same completed candle.
-    c=f["close"].astype(float); # retrigger e20=c.ewm(span=20,adjust=False).mean()
-    d=c.diff(); up=f.high.diff(); dn=-f.low.diff()
-    atr=pd.concat([f.high-f.low,(f.high-c.shift()).abs(),(f.low-c.shift()).abs()],axis=1).max(axis=1).ewm(alpha=1/14,adjust=False,min_periods=14).mean()
-    plus=pd.Series(np.where((up>dn)&(up>0),up,0),index=f.index).ewm(alpha=1/14,adjust=False,min_periods=14).mean()
-    minus=pd.Series(np.where((dn>up)&(dn>0),dn,0),index=f.index).ewm(alpha=1/14,adjust=False,min_periods=14).mean()
-    pdi=100*plus/atr; mdi=100*minus/atr
-    spread=pdi-mdi
-    return (c.shift(1)>=e20.shift(1))&(c<e20)&(spread.rolling(3).mean().diff()<0)
 
 def main():
     out=build("h4"); Path("reports").mkdir(exist_ok=True)
