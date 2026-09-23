@@ -1,15 +1,12 @@
 name: FX Live Notification Monitor
 
 on:
-  schedule:
-    - cron: "7 * * * *"
   workflow_dispatch:
   push:
-    branches: [main]
-
-concurrency:
-  group: fx-live-notification
-  cancel-in-progress: false
+    branches:
+      - main
+  schedule:
+    - cron: "7 * * * *"
 
 permissions:
   contents: write
@@ -17,16 +14,10 @@ permissions:
 
 jobs:
   monitor:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
 
       - uses: actions/setup-python@v5
         with:
@@ -39,7 +30,7 @@ jobs:
 
       - name: Evaluate notification state
         run: |
-          pip install pandas numpy
+          python -m pip install pandas numpy
           python scripts/monitor_notification_state.py
 
       - name: Publish refreshed data and state
@@ -62,27 +53,19 @@ jobs:
             echo "No entry alerts."
             exit 0
           fi
-
           python - <<'PY' > /tmp/alerts.tsv
           import csv
           with open("reports/current_notification_alerts.csv", newline="") as f:
               for r in csv.DictReader(f):
-                  print("\t".join([
-                      r["notification_id"], r["pair"], r["direction"],
-                      r["signal_candle"], r["entry_candidate_h4"]
-                  ]))
+                  print("\t".join([r["notification_id"], r["pair"], r["direction"], r["signal_candle"], r["entry_candidate_h4"]]))
           PY
-
           while IFS=$'\t' read -r id pair direction signal entry; do
             [ -z "$id" ] && continue
             existing=$(gh issue list --state open --search "FX ALERT $pair $direction in:title" --json title --jq '.[].title' | grep -F "$signal" || true)
             if [ -n "$existing" ]; then
-              echo "Already published: $id"
               continue
             fi
-
-            title="FX ALERT $pair $direction $signal"
-            body="## FX entry alert
+            gh issue create --title "FX ALERT $pair $direction $signal" --body "## FX entry alert
 
 - Pair: $pair
 - Direction: $direction
@@ -92,7 +75,6 @@ jobs:
 - Source: Dukascopy bid H4 data refreshed by GitHub Actions
 
 This issue is a durable notification event. Do not treat it as an execution order."
-            gh issue create --title "$title" --body "$body" || true
           done < /tmp/alerts.tsv
 
       - uses: actions/upload-artifact@v4
