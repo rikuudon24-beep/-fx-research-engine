@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "7 * * * *"
   workflow_dispatch:
+  push:
+    branches: [main]:
 
 concurrency:
   group: fx-live-notification
@@ -15,6 +17,7 @@ permissions:
 
 jobs:
   monitor:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,7 +92,7 @@ jobs:
 - Source: Dukascopy bid H4 data refreshed by GitHub Actions
 
 This issue is a durable notification event. Do not treat it as an execution order."
-            gh issue create --title "$title" --body "$body" --label "fx-alert" || true
+            gh issue create --title "$title" --body "$body" || true
           done < /tmp/alerts.tsv
 
       - uses: actions/upload-artifact@v4
