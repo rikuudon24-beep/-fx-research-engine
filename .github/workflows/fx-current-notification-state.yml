@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
 
 jobs:
   monitor:
@@ -21,21 +20,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Refresh market data
         run: |
           python scripts/download_market_data.py --mode incremental --end "$(date -u -d '+1 day' +%F)"
           python scripts/validate_market_data.py
-
       - name: Evaluate notification state
         run: |
           python -m pip install pandas numpy
           python scripts/monitor_notification_state.py
-
       - name: Publish refreshed data and state
         run: |
           git config user.name "github-actions[bot]"
@@ -47,46 +42,6 @@ jobs:
             git commit -m "chore: refresh FX notification state"
             git push
           fi
-
-      - name: Create durable alert issues
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ ! -s reports/current_notification_alerts.csv ]; then
-            echo "No entry alerts."
-            exit 0
-          fi
-
-          python - <<'PY' > /tmp/alerts.tsv
-          import csv
-          with open("reports/current_notification_alerts.csv", newline="") as f:
-              for r in csv.DictReader(f):
-                  print("\t".join([
-                      r["notification_id"], r["pair"], r["direction"],
-                      r["signal_candle"], r["entry_candidate_h4"]
-                  ]))
-          PY
-
-          while IFS=$'\t' read -r id pair direction signal entry; do
-            [ -z "$id" ] && continue
-            existing=$(gh issue list --state open --search "FX ALERT $pair $direction in:title" --json title --jq '.[].title' | grep -F "$signal" || true)
-            if [ -n "$existing" ]; then
-              echo "Already published: $id"
-              continue
-            fi
-
-            gh issue create --title "FX ALERT $pair $direction $signal" --body "## FX entry alert
-
-- Pair: $pair
-- Direction: $direction
-- Signal candle (completed H4): $signal
-- Next H4 entry candidate: $entry
-- Rule: frozen H4 state-machine notification rule
-- Source: Dukascopy bid H4 data refreshed by GitHub Actions
-
-This issue is a durable notification event. Do not treat it as an execution order."
-          done < /tmp/alerts.tsv
-
       - uses: actions/upload-artifact@v4
         with:
           name: current-notification-state
