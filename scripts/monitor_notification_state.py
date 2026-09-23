@@ -78,8 +78,8 @@ def evaluate(pair):
             state = "WAIT"; direction = None; touch = None; ref = None
 
     i = len(g) - 1
-    ts = pd.Timestamp(g.timestamp.iloc[i], tz="UTC")
-    signal_ts = pd.Timestamp(g.timestamp.iloc[signal], tz="UTC") if signal is not None else None
+    ts = pd.Timestamp(g.timestamp.iloc[i])
+    signal_ts = pd.Timestamp(g.timestamp.iloc[signal]) if signal is not None else None
     entry_ts = signal_ts + H4 if signal_ts is not None else None
     row = {
         "pair": pair,
