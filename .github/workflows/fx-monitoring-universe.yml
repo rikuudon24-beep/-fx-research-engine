@@ -10,7 +10,8 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with: {python-version: '3.11'}
-    - run: pip install pandas numpy
+    - run: pip install pandas numpy requests
+    - run: python scripts/research_frozen_rule_oos_robustness.py
     - run: python scripts/research_monitoring_universe.py
     - uses: actions/upload-artifact@v4
       with:
