@@ -1,0 +1,18 @@
+name: FX Monitoring Universe Screen
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with: {python-version: '3.11'}
+    - run: pip install pandas numpy
+    - run: python scripts/research_monitoring_universe.py
+    - uses: actions/upload-artifact@v4
+      with:
+        name: monitoring-universe-screen
+        path: reports/monitoring_universe_screen.csv
