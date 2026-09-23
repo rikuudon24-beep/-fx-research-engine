@@ -1,0 +1,19 @@
+name: FX Current Notification State
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pandas numpy
+      - run: python scripts/monitor_notification_state.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: current-notification-state
+          path: reports/current_notification_*.csv
