@@ -1,23 +1,32 @@
 #!/usr/bin/env python3
-"""Evaluate the frozen H4 notification state on the latest completed candle.
+"""Evaluate frozen H4 notification state using completed candles only.
 
-This is a monitoring layer, not a trade executor. It never uses the current
-incomplete candle: the latest row in each repository CSV is treated as the
-latest completed H4 candle available to the workflow.
+The monitor deliberately excludes the currently forming H4 candle based on
+UTC wall-clock time. A TRIGGERED state means the just-completed candle satisfied
+the frozen entry rule; the next H4 open is the entry candidate.
 """
 from pathlib import Path
 import importlib.util
 import pandas as pd
-import numpy as np
 
 spec = importlib.util.spec_from_file_location("d", "scripts/research_50pip_direct_entry.py")
 d = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(d)
 
 PAIRS = d.PAIRS
+H4 = pd.Timedelta(hours=4)
+
+def completed_market(pair):
+    g = d.load_market("h4", pair).sort_values("timestamp").reset_index(drop=True)
+    now = pd.Timestamp.now(tz="UTC")
+    cutoff = now.floor("4h") - H4
+    g = g[pd.to_datetime(g.timestamp, utc=True) <= cutoff].copy().reset_index(drop=True)
+    if g.empty:
+        raise RuntimeError(f"no completed H4 candles for {pair}")
+    return g
 
 def evaluate(pair):
-    g = d.load_market("h4", pair).reset_index(drop=True)
+    g = completed_market(pair)
     f = d.build_features(g)
     e20 = g.close.ewm(span=20, adjust=False).mean()
     e200 = g.close.ewm(span=200, adjust=False).mean()
@@ -30,7 +39,6 @@ def evaluate(pair):
     ref = None
     signal = None
 
-    # Replay the complete available history, then inspect the final state.
     for i in range(1, len(g)):
         if state == "WAIT":
             if bool(gc.iloc[i]):
@@ -63,20 +71,23 @@ def evaluate(pair):
             ):
                 state = "WAIT"; direction = None; touch = None; ref = None
         elif state == "TRIGGERED":
-            # The next H4 open would be the entry candidate. Keep the state
-            # visible until the next completed candle is observed.
+            # A completed candle after the signal means the entry window has
+            # already passed; replaying further history starts a new search.
             if i == len(g) - 1:
                 break
             state = "WAIT"; direction = None; touch = None; ref = None
 
     i = len(g) - 1
-    ts = pd.Timestamp(g.timestamp.iloc[i])
+    ts = pd.Timestamp(g.timestamp.iloc[i], tz="UTC")
+    signal_ts = pd.Timestamp(g.timestamp.iloc[signal], tz="UTC") if signal is not None else None
+    entry_ts = signal_ts + H4 if signal_ts is not None else None
     row = {
         "pair": pair,
         "latest_completed_h4": ts.isoformat(),
         "state": state,
         "direction": direction or "",
-        "signal_candle": pd.Timestamp(g.timestamp.iloc[signal]).isoformat() if signal is not None else "",
+        "signal_candle": signal_ts.isoformat() if signal_ts is not None else "",
+        "entry_candidate_h4": entry_ts.isoformat() if entry_ts is not None else "",
         "close": float(g.close.iloc[i]),
         "ema20": float(e20.iloc[i]),
         "ema200": float(e200.iloc[i]),
@@ -85,7 +96,7 @@ def evaluate(pair):
         "sma_stack_bull": bool(f.sma_stack_bull.iloc[i]),
         "di_strong_bull": bool(f.di_strong_bull.iloc[i]),
         "strong_close_bear": bool(f.strong_close_bear.iloc[i]),
-        "source": "repository_h4_csv",
+        "source": "dukascopy_h4_csv",
     }
     return row
 
@@ -94,12 +105,23 @@ def main():
     out = pd.DataFrame(rows)
     Path("reports").mkdir(exist_ok=True)
     out.to_csv("reports/current_notification_state.csv", index=False)
-    active = out[out.state.isin(["ARMED", "TRIGGERED"])]
+
+    active = out[out.state.isin(["ARMED", "TRIGGERED"])].copy()
     active.to_csv("reports/current_notification_candidates.csv", index=False)
+
+    alerts = out[out.state == "TRIGGERED"].copy()
+    alerts["notification_id"] = alerts.apply(
+        lambda r: f"{r['pair']}|{r['direction']}|{r['signal_candle']}", axis=1
+    )
+    alerts.to_csv("reports/current_notification_alerts.csv", index=False)
+
     print("=== CURRENT NOTIFICATION STATE ===")
     print(out.to_string(index=False))
     print("=== ACTIVE CANDIDATES ===")
     print(active.to_string(index=False) if len(active) else "none")
+    print("=== NEW ALERT CANDIDATES ===")
+    print(alerts[["notification_id","pair","direction","signal_candle","entry_candidate_h4"]].to_string(index=False)
+          if len(alerts) else "none")
 
 if __name__ == "__main__":
     main()
