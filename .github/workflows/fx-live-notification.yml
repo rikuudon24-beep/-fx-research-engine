@@ -5,7 +5,7 @@ on:
     - cron: "7 * * * *"
   workflow_dispatch:
   push:
-    branches: [main]:
+    branches: [main]
 
 concurrency:
   group: fx-live-notification
