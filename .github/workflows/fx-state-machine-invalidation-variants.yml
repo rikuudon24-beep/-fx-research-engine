@@ -1,0 +1,26 @@
+name: FX State Machine Invalidation Variants
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/research_state_machine_invalidation_variants.py'
+      - 'scripts/research_50pip_direct_entry.py'
+      - 'data/market/h4/**'
+      - '.github/workflows/fx-state-machine-invalidation-variants.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pandas numpy
+      - run: python scripts/research_state_machine_invalidation_variants.py
+      - uses: EndBug/add-and-commit@v9
+        with:
+          add: 'reports/state_machine_invalidation_variant_events.csv reports/state_machine_invalidation_variant_results.csv'
+          message: 'research: compare state-machine invalidation rules'
