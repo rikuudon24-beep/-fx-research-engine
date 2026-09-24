@@ -1,5 +1,10 @@
 name: FX EURGBP Notification Diagnostic
 on:
+  push:
+    paths:
+      - "scripts/diagnose_eurgbp_notification.py"
+      - ".github/workflows/fx-eurgbp-notification-diagnostic.yml"
+      - "scripts/research_50pip_direct_entry.py"
   workflow_dispatch:
 permissions:
   contents: write
