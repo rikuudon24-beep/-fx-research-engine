@@ -38,6 +38,7 @@ def evaluate(pair):
     touch = None
     ref = None
     signal = None
+    breach_streak = 0
 
     for i in range(1, len(g)):
         if state == "WAIT":
@@ -47,15 +48,16 @@ def evaluate(pair):
                 direction = "short"; state = "SEARCH_TOUCH"
         elif state == "SEARCH_TOUCH":
             if (direction == "long" and bool(dc.iloc[i])) or (direction == "short" and bool(gc.iloc[i])):
-                state = "WAIT"; direction = None; touch = None; ref = None
+                state = "WAIT"; direction = None; touch = None; ref = None; breach_streak = 0
                 continue
             if float(g.low.iloc[i]) <= float(e20.iloc[i]) <= float(g.high.iloc[i]):
                 touch = i
                 ref = float(g.high.iloc[i] if direction == "long" else g.low.iloc[i])
+                breach_streak = 0
                 state = "ARMED"
         elif state == "ARMED":
             if (direction == "long" and bool(dc.iloc[i])) or (direction == "short" and bool(gc.iloc[i])):
-                state = "WAIT"; direction = None; touch = None; ref = None
+                state = "WAIT"; direction = None; touch = None; ref = None; breach_streak = 0
                 continue
             filt = (
                 bool(f.sma_stack_bull.iloc[i]) and bool(f.di_strong_bull.iloc[i])
@@ -65,17 +67,20 @@ def evaluate(pair):
             if filt and trig:
                 signal = i
                 state = "TRIGGERED"
-            elif (
-                (direction == "long" and float(g.close.iloc[i]) <= float(g.low.iloc[touch]))
-                or (direction == "short" and float(g.close.iloc[i]) >= float(g.high.iloc[touch]))
-            ):
-                state = "WAIT"; direction = None; touch = None; ref = None
+            else:
+                breached = (
+                    (direction == "long" and float(g.close.iloc[i]) <= float(g.low.iloc[touch]))
+                    or (direction == "short" and float(g.close.iloc[i]) >= float(g.high.iloc[touch]))
+                )
+                breach_streak = breach_streak + 1 if breached else 0
+                if breach_streak >= 2:
+                    state = "WAIT"; direction = None; touch = None; ref = None; breach_streak = 0
         elif state == "TRIGGERED":
             # A completed candle after the signal means the entry window has
             # already passed; replaying further history starts a new search.
             if i == len(g) - 1:
                 break
-            state = "WAIT"; direction = None; touch = None; ref = None
+            state = "WAIT"; direction = None; touch = None; ref = None; breach_streak = 0
 
     i = len(g) - 1
     ts = pd.Timestamp(g.timestamp.iloc[i])
