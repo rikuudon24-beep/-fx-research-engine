@@ -1,0 +1,33 @@
+name: FX EURGBP Notification Diagnostic
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Refresh market data
+        run: |
+          python scripts/download_market_data.py --mode incremental --end "$(date -u -d '+1 day' +%F)"
+          python scripts/validate_market_data.py
+      - name: Run EURGBP diagnostic
+        run: |
+          python -m pip install pandas numpy
+          python scripts/diagnose_eurgbp_notification.py
+      - name: Commit diagnostic
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/eurgbp_notification_diagnostic.csv
+          git commit -m "research: diagnose EURGBP notification path" || true
+          git push || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eurgbp-notification-diagnostic
+          path: reports/eurgbp_notification_diagnostic.csv
