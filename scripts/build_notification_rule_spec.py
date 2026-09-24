@@ -4,8 +4,8 @@ from pathlib import Path
 import pandas as pd
 Path("reports").mkdir(exist_ok=True)
 rows=[
-["LONG","H4","20EMA>200EMA GC後","最初の20EMAタッチ","基準足高値を実体上抜け","SMA stack bull + DI strong bull","次足始値候補","managed exit"],
-["SHORT","H4","20EMA<200EMA DC後","最初の20EMAタッチ","基準足安値を実体下抜け","strong close bear","次足始値候補","managed exit"],
+["LONG","H4","20EMA>200EMA GC後","最初の20EMAタッチ","基準足高値を実体上抜け","SMA stack bull + DI strong bull","次足始値候補","managed exit; pre-entry invalidation requires 2 consecutive closes beyond touch low"],
+["SHORT","H4","20EMA<200EMA DC後","最初の20EMAタッチ","基準足安値を実体下抜け","strong close bear","次足始値候補","managed exit; pre-entry invalidation requires 2 consecutive closes beyond touch high"],
 ]
 pd.DataFrame(rows,columns=["direction","timeframe","state","setup","trigger","filter","entry","exit"]).to_csv("reports/notification_rule_spec.csv",index=False)
 # Notification state machine: WAIT -> ARMED -> TRIGGERED -> MANAGED -> CLOSED
