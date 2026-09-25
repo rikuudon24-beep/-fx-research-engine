@@ -1,1 +1,2 @@
 pair,latest_completed_h4,state,direction,signal_candle,entry_candidate_h4,close,ema20,ema200,gc,dc,sma_stack_bull,di_strong_bull,strong_close_bear,source
+usdjpy,2026-09-25T04:00:00+00:00,ARMED,long,2026-05-26T12:00:00+00:00,2026-05-26T16:00:00+00:00,158.093,158.073801885871,157.47669490650924,False,False,False,False,False,dukascopy_h4_csv
