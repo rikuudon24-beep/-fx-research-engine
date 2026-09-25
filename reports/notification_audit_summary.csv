@@ -1,0 +1,2 @@
+pairs,trigger_events,near_miss_or_reset_events,duplicate_trigger_keys,incomplete_candles_seen_by_audit,audit_status
+12,386,1393,0,10,PASS
