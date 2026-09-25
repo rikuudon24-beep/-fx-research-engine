@@ -1,0 +1,44 @@
+name: FX Notification Integrity Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/audit_notification_integrity.py"
+      - "scripts/research_50pip_direct_entry.py"
+      - "data/market/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Audit notification integrity
+        run: |
+          python -m pip install pandas numpy
+          python scripts/audit_notification_integrity.py
+      - name: Save audit reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/notification_audit_events.csv reports/notification_audit_summary.csv
+          if git diff --cached --quiet; then
+            echo "No audit report changes."
+          else
+            git commit -m "chore: update notification integrity audit"
+            git push
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notification-integrity-audit
+          path: reports/notification_audit_*.csv
